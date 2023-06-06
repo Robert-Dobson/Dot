@@ -44,9 +44,9 @@ class MusicCog(commands.Cog):
                 except Exception as e:
                      print(e) # Debugging purposes
                      return False
-            return {'title': info['title'], 'id': info['id']} 
+            return {'title': info['title'], 'path': f"{info['title']} [{info['id']}].mp3"} 
     
-    def end_song(self, path, remove=True):
+    def end_song(self, path, remove):
         # Remove file to clear up space if not in queue anymore
         match = re.search(".*\[(.*)\].*", path)
         if match and remove:
@@ -58,25 +58,26 @@ class MusicCog(commands.Cog):
                 except Exception as e:
                     print(e) # Debugging purposes
             
-        self.play_next()
+        self.play_next(remove)
         
 
-    def play_next(self):
+    def play_next(self, remove):
         if len(self.music_queue) > 0:
             self.is_playing = True
             music = self.music_queue.pop(0)
-            path = f"{music[0]['title']} [{music[0]['id']}].mp3"
-            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg.exe", options="-vn"), after = lambda e : self.end_song(path))
+            path = music[0]['path']
+            
+            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg.exe", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
             
 
-    async def start_music(self, ctx):
+    async def start_music(self, ctx, remove=True):
         if len(self.music_queue) > 0:
             self.is_playing = True
             target_vc = self.music_queue[0][1]
             music = self.music_queue.pop(0)
-            path = f"{music[0]['title']} [{music[0]['id']}].mp3"
+            path = music[0]['path']
 
             # If not connected to any voice channel
             if self.vc == None or not self.vc.is_connected():
@@ -93,7 +94,7 @@ class MusicCog(commands.Cog):
                     await self.vc.move_to(target_vc)
             
             # Play Music
-            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg.exe", options="-vn"), after = lambda e : self.end_song(path))
+            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg.exe", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
 
@@ -173,7 +174,7 @@ class MusicCog(commands.Cog):
     @commands.command()
     async def clear(self, ctx):
         self.music_queue = []
-        self.skip()
+        self.skip(ctx)
         await ctx.send("Music queue is cleared!")
 
     @commands.command(alias=["disconnect"])
@@ -197,16 +198,42 @@ class MusicCog(commands.Cog):
     
     @commands.group()
     async def playlist(self, ctx):
-        if ctx.invoked_command is None:
-            await ctx.send("Invalid playlist command. Use play or playlist")
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Invalid playlist command. Use p (for play) or list")
 
     @playlist.command()
-    async def play(self, ctx, *args):
-        pass
+    async def p(self, ctx, *args):
+        query = " ".join(args)
+
+        # Get users voice channel
+        voice_channel = ctx.author.voice.channel if ctx.author.voice else None
+        if voice_channel is None:
+            await ctx.send("Connect to a voice channel!")
+        else:
+            if query != " ":
+                if query in os.listdir('./playlists'):
+                    # add songs to list
+                    for song in os.listdir(f"./playlists/{query}"):
+                        song = {'title': song[:-4], 'path': f"./playlists/{query}/{song}"}
+                        self.music_queue.append([song, voice_channel])
+                    
+                    # Start playing songs
+                    await self.start_music(ctx, False)
+                else:
+                    await ctx.send(f"{query} is not a playlist!")
+
+      
 
     @playlist.command()
     async def list(self, ctx):
-        pass
+        list = ""
+        for i, playlist in enumerate(os.listdir('./playlists')):
+            list += f"{i}: {playlist} \n"
+        
+        if list == "":
+            await ctx.send("No playlists found!")
+        else:
+            await ctx.send(list)
 
 async def setup(bot):
     await bot.add_cog(MusicCog(bot))
