@@ -3,16 +3,14 @@ from discord.ext import commands
 from yt_dlp import YoutubeDL
 import os
 import re
+import random
+
 
 # TODO: Parallel for getting youtube music
 # TODO: Understand why we can't replace the play mp3 code in first play with just call to function
 # TODO: Do we need self.is_paused bit in play command
-# TODO: Clear - delete the songs
 # TODO: Remove specific songs
-# TODO: Make queue command nicer
 # TODO: Current song playing command?
-# TODO: Make sure all is deleted nice
-# TODO: Playlists
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -173,11 +171,18 @@ class MusicCog(commands.Cog):
 
     @commands.command()
     async def clear(self, ctx):
+
         self.music_queue = []
         self.skip(ctx)
+
+        # Delete all left over mp3 songs
+        for filename in os.listdir('.'):
+            if filename.endswith('.mp3'):
+                os.remove(filename)
+
         await ctx.send("Music queue is cleared!")
 
-    @commands.command(alias=["disconnect"])
+    @commands.command(alias=["disconnect", "quit"])
     async def leave(self, ctx):
         self.music_queue = []
         
@@ -194,6 +199,10 @@ class MusicCog(commands.Cog):
         for filename in os.listdir('.'):
             if filename.endswith('.mp3'):
                 os.remove(filename)
+
+    @commands.command()
+    async def suffle(self, ctx):
+        random.shuffle(self.music_queue)
     
     
     @commands.group()

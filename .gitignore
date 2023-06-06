@@ -108,4 +108,7 @@ GitHub.sublime-settings
 # Key #
 .env
 *.mp3
+*.webm
+*.ytdl
+*.part
 .playlists/
