@@ -2,15 +2,15 @@ import discord
 from discord.ext import commands
 from yt_dlp import YoutubeDL
 import os
-import re
 import random
-
 
 # TODO: Parallel for getting youtube music
 # TODO: Understand why we can't replace the play mp3 code in first play with just call to function
 # TODO: Do we need self.is_paused bit in play command
 # TODO: Remove specific songs
 # TODO: Current song playing command?
+# TODO: Playlist not remove - refix
+# TODO: Add to playlist
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -42,40 +42,40 @@ class MusicCog(commands.Cog):
                 except Exception as e:
                      print(e) # Debugging purposes
                      return False
-            return {'title': info['title'], 'path': f"{info['title']} [{info['id']}].mp3"} 
+            return {'title': info['title'], 'path': f"{info['title']} [{info['id']}].mp3", 'delete': True} 
     
     def end_song(self, path, remove):
         # Remove file to clear up space if not in queue anymore
-        match = re.search(".*\[(.*)\].*", path)
-        if match and remove:
-            song_id = match.group(1)
-                
-            if len([song[0] for song in self.music_queue if song[0]['id'] == song_id]) == 0:
-                try:
-                    os.remove(path)
-                except Exception as e:
-                    print(e) # Debugging purposes
+        if remove:
+            for song in self.music_queue:
+                if song == path:
+                    try:
+                        os.remove(path)
+                    except Exception as e:
+                        print(e)
             
-        self.play_next(remove)
+        self.play_next()
         
 
-    def play_next(self, remove):
+    def play_next(self):
         if len(self.music_queue) > 0:
             self.is_playing = True
             music = self.music_queue.pop(0)
             path = music[0]['path']
+            remove = music[0]['delete']
             
-            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg.exe", options="-vn"), after = lambda e : self.end_song(path, remove))
+            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
             
 
-    async def start_music(self, ctx, remove=True):
+    async def start_music(self, ctx):
         if len(self.music_queue) > 0:
             self.is_playing = True
             target_vc = self.music_queue[0][1]
             music = self.music_queue.pop(0)
             path = music[0]['path']
+            remove = music[0]['delete']
 
             # If not connected to any voice channel
             if self.vc == None or not self.vc.is_connected():
@@ -92,7 +92,7 @@ class MusicCog(commands.Cog):
                     await self.vc.move_to(target_vc)
             
             # Play Music
-            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg.exe", options="-vn"), after = lambda e : self.end_song(path, remove))
+            self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
 
@@ -148,7 +148,7 @@ class MusicCog(commands.Cog):
     @commands.command()
     async def skip(self, ctx):
         if self.vc != None and self.is_playing == True:
-            os.system("taskkill /F /im ffmpeg.exe")
+            os.system("killall -KILL ffmpeg")
         else:
             await ctx.send("Not playing any music!")
 
@@ -188,7 +188,7 @@ class MusicCog(commands.Cog):
         
         # Stop music if playing
         if self.is_playing:  
-            os.system("taskkill /F /im ffmpeg.exe")
+            os.system("killall -KILL ffmpeg")
         
         self.is_playing = False
         self.is_paused = False
@@ -200,9 +200,10 @@ class MusicCog(commands.Cog):
             if filename.endswith('.mp3'):
                 os.remove(filename)
 
-    @commands.command()
-    async def suffle(self, ctx):
+    @commands.command(alias=["suffle"])
+    async def shuffle(self, ctx):
         random.shuffle(self.music_queue)
+        await ctx.send("Playlist shuffled!")
     
     
     @commands.group()
@@ -223,11 +224,15 @@ class MusicCog(commands.Cog):
                 if query in os.listdir('./playlists'):
                     # add songs to list
                     for song in os.listdir(f"./playlists/{query}"):
-                        song = {'title': song[:-4], 'path': f"./playlists/{query}/{song}"}
+                        song = {'title': song[:-4], 'path': f"./playlists/{query}/{song}", 'delete': False}
                         self.music_queue.append([song, voice_channel])
                     
+                    # Shuffle queue
+                    random.shuffle(self.music_queue)
+
                     # Start playing songs
-                    await self.start_music(ctx, False)
+                    await ctx.send(f"Playlist {query} has been added to the queue!")
+                    await self.start_music(ctx)
                 else:
                     await ctx.send(f"{query} is not a playlist!")
 
