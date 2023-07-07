@@ -1,8 +1,12 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from yt_dlp import YoutubeDL
 import os
 import random
+import datetime
+import re
+
+sync_playlist_time = datetime.time(hour=14) # 2am GMT or 3am BST
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -22,6 +26,17 @@ class MusicCog(commands.Cog):
                 'preferredquality': '192',
             }],
         }
+
+        self.YDL_OPTIONS_PLAYLIST = {
+            'format':'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+
+        }
+
         self.pid = 0
         
         self.vc = None
@@ -59,7 +74,60 @@ class MusicCog(commands.Cog):
             self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
-            
+    
+    def playlist_sync(self):
+        # Get playlists and ids
+        playlists = [elem.split(":") for elem in os.getenv("playlists").split("/")]
+
+        for playlist in playlists:
+            # Skip empty playlists
+            if playlist == [""]:
+                continue
+                
+            if playlist[0] in os.listdir('./playlists'):
+                # Get songs in youtube playlist
+                with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
+                    try:
+                        remote_songs = ydl.extract_info(f"https://www.youtube.com/playlist?list={playlist[1]}", download=False)['entries']
+                    except Exception as e:
+                        print(e)
+                        
+                # Compare local songs to remote songs and update local songs to match
+                remote_songs = [f"{song_info['title']} [{song_info['id']}].mp3" for song_info in remote_songs]
+                local_songs = os.listdir(f"./playlists/{playlist[0]}")
+
+                missing_songs = list(set(remote_songs) - set(local_songs))
+                remove_songs = list(set(local_songs) - set(remote_songs))
+
+                # Download any missing songs
+                if (len(missing_songs) > 0):
+                    missing_song_ids = [re.findall(".*\[(.*)\].*", path)[-1] for path in missing_songs]
+                    download_options = dict(self.YDL_OPTIONS)
+                    download_options['outtmpl'] = f"{os.getcwd()}/playlists/{playlist[0]}/%(title)s [%(id)s].%(ext)s"
+
+                    for missing_song_id in missing_song_ids:
+                        with YoutubeDL(download_options) as ydl:
+                            try:
+                                songs = ydl.extract_info(f"https://www.youtube.com/watch?v={missing_song_id}", download=True)
+                            except Exception as e:
+                                print(e)
+
+                # Delete any remove_songs
+                if (len(remove_songs) > 0):
+                    for remove_song in remove_songs:
+                        os.remove(f"./playlists/{playlist[0]}/{remove_song}")
+            else:
+                # Create folder and download all songs
+                os.mkdir(f"./playlists/{playlist[0]}")
+                download_options = dict(self.YDL_OPTIONS_PLAYLIST)
+                download_options['outtmpl'] = f"./playlists/{playlist[0]}/%(title)s [%(id)s].%(ext)s"
+
+                with YoutubeDL(download_options) as ydl:
+                    try:
+                        songs = ydl.extract_info(f"https://www.youtube.com/playlist?list={playlist[1]}", download=True)
+                    except Exception as e:
+                        print(e)
+
     async def start_music(self, ctx):
         if len(self.music_queue) > 0:
             self.is_playing = True
@@ -239,6 +307,16 @@ class MusicCog(commands.Cog):
             await ctx.send("No playlists found!")
         else:
             await ctx.send(list)
+
+    @playlist.command()
+    async def sync(self, ctx):
+        await ctx.send("Syncing playlists (this may take a while)")
+        self.playlist_sync()
+        await ctx.send("Playlists have now been synced")
+
+    @tasks.loop(time=sync_playlist_time)
+    async def check_playlists(self, ctx):
+        self.playlist_sync()
 
 async def setup(bot):
     await bot.add_cog(MusicCog(bot))
