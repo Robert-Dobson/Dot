@@ -4,14 +4,6 @@ from yt_dlp import YoutubeDL
 import os
 import random
 
-# TODO: Parallel for getting youtube music
-# TODO: Understand why we can't replace the play mp3 code in first play with just call to function
-# TODO: Do we need self.is_paused bit in play command
-# TODO: Remove specific songs
-# TODO: Current song playing command?
-# TODO: Playlist not remove - refix
-# TODO: Add to playlist
-
 class MusicCog(commands.Cog):
     def __init__(self, bot):
         super().__init__()
@@ -68,7 +60,6 @@ class MusicCog(commands.Cog):
         else:
             self.is_playing = False
             
-
     async def start_music(self, ctx):
         if len(self.music_queue) > 0:
             self.is_playing = True
