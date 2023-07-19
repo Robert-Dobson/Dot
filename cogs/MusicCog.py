@@ -6,8 +6,9 @@ import random
 import datetime
 import threading
 import re
+import asyncio
 
-sync_playlist_time = datetime.time(hour=14, minute=0) # 2am GMT or 3am BST
+sync_playlist_time = datetime.time(hour=14, minute=0, tzinfo=datetime.timezone.utc) # 2am GMT or 3am BST
 
 class MusicCog(commands.Cog):
     def __init__(self, bot):
@@ -45,6 +46,9 @@ class MusicCog(commands.Cog):
         # Start schedule for syncing playlists at night
         self.check_playlists.start()
     
+    def cog_unload(self):
+        self.check_playlists.cancel()
+    
     def search_youtube(self, item):
             # Use youtube downloader to download the youtube song
             with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -55,7 +59,7 @@ class MusicCog(commands.Cog):
                      print(e) 
                      return False
             print(f"LOG: Downloaded (temporarily) {info['title']}")
-            return {'title': info['title'], 'path': f"{info['title']} [{info['id']}].mp3", 'delete': True} 
+            return {'title': info['title'], 'path': f"./{info['title']} [{info['id']}].mp3", 'delete': True} 
     
     def end_song(self, path, remove):
         # Remove file to clear up space if not in queue anymore
@@ -189,8 +193,9 @@ class MusicCog(commands.Cog):
             self.vc.resume()
         else:
             if query != " ":
+                await ctx.send("Searching for song, this might take a while!")
                 # Find song and play it
-                song = await self.search_youtube(query)
+                song = self.search_youtube(query)
                 if song == False:
                     await ctx.send("Could not find the song. Please try again")
                 else:
@@ -263,7 +268,7 @@ class MusicCog(commands.Cog):
         await ctx.send("Music queue is cleared!")
 
     @commands.command(alias=["disconnect", "quit"])
-    async def leave(self, ctx):
+    async def leave(self, *args):
         self.music_queue = []
         
         # Stop music if playing
@@ -339,6 +344,33 @@ class MusicCog(commands.Cog):
     async def check_playlists(self, ctx):
         thread = threading.Thread(target=self.playlist_sync, daemon=True)
         thread.start()
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        # Automatic leaving of voice chat if alone
+        if member.id == self.bot.user.id:
+            return
+
+        # User has left channel
+        if before.channel != None:
+            voice = discord.utils.get(self.bot.voice_clients, channel__guild__id = before.channel.guild.id)
+
+            if voice == None or voice.channel.id != before.channel.id:
+                return
+            
+            if len(voice.channel.members) <= 1:
+                time = 0
+                while True:
+                    await asyncio.sleep(1)
+                    time += 1
+
+                    if len(voice.channel.members) >= 2 or not voice.is_connected():
+                        break
+                    
+                    if time >= 5:
+                        await self.leave(voice)
+                        return
+
 
 async def setup(bot):
     await bot.add_cog(MusicCog(bot))
