@@ -3,6 +3,7 @@ from discord.ext import commands
 import os
 from dotenv import load_dotenv
 import asyncio
+import logging
 
 bot = commands.Bot(command_prefix = "/", intents = discord.Intents.all())
 
@@ -16,5 +17,6 @@ async def test(ctx):
     await ctx.send("Testing 123")
 
 # Run Bot
+handler = logging.FileHandler(filename='dot.log', encoding='utf-8', mode='a')
 load_dotenv()
-bot.run(os.getenv("discord_token")) 
+bot.run(os.getenv("discord_token"), log_handler=handler, root_logger=True, log_level=logging.INFO) 

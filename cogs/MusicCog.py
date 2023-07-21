@@ -7,6 +7,7 @@ import datetime
 import threading
 import re
 import asyncio
+import logging
 
 sync_playlist_time = datetime.time(hour=14, minute=0, tzinfo=datetime.timezone.utc) # 2am GMT or 3am BST
 
@@ -52,26 +53,26 @@ class MusicCog(commands.Cog):
     def search_youtube(self, item):
             # Use youtube downloader to download the youtube song
             with YoutubeDL(self.YDL_OPTIONS) as ydl:
+                logging.info(f"Searching YouTube for {item}")
                 try:
                      info = ydl.extract_info("ytsearch:%s" % item, download=True)['entries'][0]
                 except Exception as e:
-                     print(f"ERROR: Issue downloading song through play function")
-                     print(e) 
+                     logging.error(f"Issue downloading {item} through play function: {e}")
                      return False
-            print(f"LOG: Downloaded (temporarily) {info['title']}")
-            return {'title': info['title'], 'path': f"./{info['title']} [{info['id']}].mp3", 'delete': True} 
+            logging.info(f"Downloaded (temporarily) {info['title']}")
+            return {'title': info['title'], 'path': f"{os.getcwd()}/{info['title']} [{info['id']}].mp3", 'delete': True} 
     
     def end_song(self, path, remove):
         # Remove file to clear up space if not in queue anymore
+        # TODO: Bug here?
         if remove:
             for song in self.music_queue:
-                if song == path:
+                if song['path'] == path:
                     try:
-                        print(f"LOG: Removed {path}")
+                        logging.info(f"Removed {path} through normal play functionality")
                         os.remove(path)
                     except Exception as e:
-                        print(f"ERORR: Issue removing temporary song from storage")
-                        print(e)
+                        logging.error(f"Issue removing temporary song from storage: {e}")
             
         self.play_next()
         
@@ -83,13 +84,13 @@ class MusicCog(commands.Cog):
             path = music[0]['path']
             remove = music[0]['delete']
             
-            print(f"LOG: Playing {music[0]['title']}")
+            logging.info(f"Playing {music[0]['title']}")
             self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
     
     def playlist_sync(self):
-        print("LOG: Started playlist sync")
+        logging.info("Started local playlist sync")
 
         # Get playlists and ids
         playlists = [elem.split(":") for elem in os.getenv("playlists").split("/")]
@@ -103,13 +104,13 @@ class MusicCog(commands.Cog):
                 # Get songs in youtube playlist
                 with YoutubeDL(self.YDL_OPTIONS_PLAYLIST) as ydl:
                     try:
-                        print("LOG: Gathering playlist data for sync")
+                        logging.info("Gathering playlist data for sync")
                         remote_songs = ydl.extract_info(f"https://www.youtube.com/playlist?list={playlist[1]}", download=False)['entries']
                     except Exception as e:
-                        print(e)
+                        logging.error("Issue fetching playlist data for sync")
                         
                 # Compare local songs to remote songs and update local songs to match
-                print("LOG: Comparing remote playlists to local playlists")
+                logging.info("Comparing remote playlists to local playlists for sync")
                 remote_songs = [f"{song_info['title']} [{song_info['id']}].mp3" for song_info in remote_songs]
                 local_songs = os.listdir(f"./playlists/{playlist[0]}")
 
@@ -118,41 +119,41 @@ class MusicCog(commands.Cog):
 
                 # Download any missing songs
                 if (len(missing_songs) > 0):
-                    print(f"LOG: Found missing songs in {playlist[0]} playlist, downloading now")
+                    logging.info("Found missing songs in {playlist[0]} playlist, downloading now")
                     missing_song_ids = [re.findall(".*\[(.*)\].*", path)[-1] for path in missing_songs]
                     download_options = dict(self.YDL_OPTIONS)
                     download_options['outtmpl'] = f"{os.getcwd()}/playlists/{playlist[0]}/%(title)s [%(id)s].%(ext)s"
 
                     for missing_song_id in missing_song_ids:
-                        print(f"LOG: Downloading song_id:{missing_song_id} for playlist:{playlist[0]}")
+                        logging.info(f"Downloading song_id:{missing_song_id} for playlist:{playlist[0]}")
                         with YoutubeDL(download_options) as ydl:
                             try:
                                 songs = ydl.extract_info(f"https://www.youtube.com/watch?v={missing_song_id}", download=True)
                             except Exception as e:
-                                print(f"ERROR: Issue downloading song for playlist")
-                                print(e)
+                                logging.error(f"Issue downloading song id: {missing_song_id} for playlist {playlist[0]}: {e}")
 
                 # Delete any remove_songs
                 if (len(remove_songs) > 0):
                     for remove_song in remove_songs:
                         try:
+                            logging.info(f"Removing {remove_song} from {playlist[0]}")
                             os.remove(f"./playlists/{playlist[0]}/{remove_song}")
                         except Exception as e:
-                            print("ERROR: Issue removing song from local playlist")
-                            print(e)
+                            logging.error(f"Issue removing {remove_song} from local playlist {playlist[0]}: {e}")
             else:
                 # Create folder and download all songs
                 os.mkdir(f"./playlists/{playlist[0]}")
                 download_options = dict(self.YDL_OPTIONS_PLAYLIST)
                 download_options['outtmpl'] = f"./playlists/{playlist[0]}/%(title)s [%(id)s].%(ext)s"
-                print(f"LOG: {playlist[0]} playlist doesn't exist, downloading now")
+                logging.info(f"{playlist[0]} playlist doesn't exist, downloading now")
 
                 with YoutubeDL(download_options) as ydl:
                     try:
                         songs = ydl.extract_info(f"https://www.youtube.com/playlist?list={playlist[1]}", download=True)
                     except Exception as e:
-                        print(f"ERORR: Issue downloading new playlist")
-                        print(e)     
+                        logging.error(f"Issue downloading new playlist from scratch: {e}")   
+            
+            logging.info("Playlist sync complete")
 
     async def start_music(self, ctx):
         if len(self.music_queue) > 0:
@@ -169,6 +170,7 @@ class MusicCog(commands.Cog):
                 # If we failed to connect to our channel
                 if self.vc == None:
                     await ctx.send("Could not connect to the voice channel")
+                    log.error("Dot couldn't connect to a voice channel")
                     return
             else:
                 # Move to our channel
@@ -176,6 +178,7 @@ class MusicCog(commands.Cog):
                     await self.vc.move_to(target_vc)
             
             # Play Music
+            log.info(f"Playing {music[0]['title']}")
             self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
@@ -232,7 +235,9 @@ class MusicCog(commands.Cog):
 
     @commands.command()
     async def skip(self, ctx):
+        #TODO: Potential Bug
         if self.vc != None and self.is_playing == True:
+            logging.info("Skipping song by killing ffmpeg process")
             os.system("killall -KILL ffmpeg")
         else:
             await ctx.send("Not playing any music!")
@@ -263,6 +268,7 @@ class MusicCog(commands.Cog):
         # Delete all left over mp3 songs
         for filename in os.listdir('.'):
             if filename.endswith('.mp3'):
+                logging.info(f"Removing {filename} as part of clearing queue")
                 os.remove(filename)
 
         await ctx.send("Music queue is cleared!")
@@ -273,6 +279,7 @@ class MusicCog(commands.Cog):
         
         # Stop music if playing
         if self.is_playing:  
+            logging.info("Stop music by killing all ffmpeg processes")
             os.system("killall -KILL ffmpeg")
         
         self.is_playing = False
@@ -283,6 +290,7 @@ class MusicCog(commands.Cog):
         # Delete all left over mp3 songs
         for filename in os.listdir('.'):
             if filename.endswith('.mp3'):
+                logging.info(f"Removing {filename} as part of the bot leaving")
                 os.remove(filename)
 
     @commands.command(alias=["suffle"])
@@ -317,11 +325,10 @@ class MusicCog(commands.Cog):
 
                     # Start playing songs
                     await ctx.send(f"Playlist {query} has been added to the queue!")
+                    logging.info(f"Added playlist {query} to the queue")
                     await self.start_music(ctx)
                 else:
                     await ctx.send(f"{query} is not a playlist!")
-
-      
 
     @playlist.command()
     async def list(self, ctx):
@@ -336,12 +343,14 @@ class MusicCog(commands.Cog):
 
     @playlist.command()
     async def sync(self, ctx):
+        logging.info("Commenced on demand sync of playlists")
         await ctx.send("Syncing playlists (this may take a while)")
         thread = threading.Thread(target=self.playlist_sync, daemon=True)
         thread.start()
 
     @tasks.loop(time=sync_playlist_time)
     async def check_playlists(self, ctx):
+        logging.info("Commenced scheduled sync of playlists")
         thread = threading.Thread(target=self.playlist_sync, daemon=True)
         thread.start()
 
@@ -368,9 +377,9 @@ class MusicCog(commands.Cog):
                         break
                     
                     if time >= 5:
+                        logging.info("Left voice channel automatically")
                         await self.leave(voice)
                         return
-
 
 async def setup(bot):
     await bot.add_cog(MusicCog(bot))
