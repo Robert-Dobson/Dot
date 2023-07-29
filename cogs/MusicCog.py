@@ -44,6 +44,7 @@ class MusicCog(commands.Cog):
         self.pid = 0
         self.vc = None
         self.is_syncing = False
+        self.current_song = None
 
         # Start schedule for syncing playlists at night
         self.check_playlists.start()
@@ -64,17 +65,14 @@ class MusicCog(commands.Cog):
             return {'title': info['title'], 'path': f"{os.getcwd()}/{info['title']} [{info['id']}].mp3", 'delete': True} 
     
     def end_song(self, path, remove):
-        # Remove file to clear up space if not in queue anymore
-        # TODO: Bug here?
+        self.current_song = None
         if remove:
-            for song in self.music_queue:
-                if song['path'] == path:
-                    try:
-                        logging.info(f"Removed {path} through normal play functionality")
-                        os.remove(path)
-                    except Exception as e:
-                        logging.error(f"Issue removing temporary song from storage: {e}")
-            
+            try:
+                os.remove(path)
+                logging.info(f"Removed {path} through normal play functionality")
+            except Exception as e:
+                logging.error(f"Issue removing temporary song from storage: {e}")
+        
         self.play_next()
         
 
@@ -89,6 +87,7 @@ class MusicCog(commands.Cog):
                 logging.error(f"Tried to play a song that doesn't exist: {music[0]['path']}")
             else:
                 logging.info(f"Playing {music[0]['title']}")
+                self.current_song = music[0]['title']
                 self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
@@ -187,6 +186,7 @@ class MusicCog(commands.Cog):
             
             # Play Music
             logging.info(f"Playing {music[0]['title']}")
+            self.current_song = music[0]['title']
             self.vc.play(discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"), after = lambda e : self.end_song(path, remove))
         else:
             self.is_playing = False
@@ -206,7 +206,8 @@ class MusicCog(commands.Cog):
             if query != " ":
                 await ctx.send("Searching for song, this might take a while!")
                 # Find song and play it
-                song = self.search_youtube(query)
+                coroutine = asyncio.to_thread(self.search_youtube, query)
+                song = await coroutine
                 if song == False:
                     await ctx.send("Could not find the song. Please try again")
                 else:
@@ -242,8 +243,37 @@ class MusicCog(commands.Cog):
             await ctx.send("No music is paused!")
 
     @commands.command()
-    async def skip(self, ctx):
-        #TODO: Potential Bug
+    async def skip(self, ctx, *args):
+        if len(args) > 1:
+            await ctx.send("Too many arguments!")
+            return
+        elif len(args) == 1:
+            if not args[0].isnumeric():
+                await ctx.send("Enter an integer number to skip n songs")
+                return
+            
+            # Skip n songs
+            n = int(args[0])
+            if n > 1:
+                if len(self.music_queue) < n:
+                    await ctx.send("There's not enough songs in the queue")
+                    return
+
+                # Remove n-1 songs from queue
+                for i in range(n-1):
+                    # Remember to delete any temporary songs 
+                    if self.music_queue[i][0]['delete']:
+                        path = self.music_queue[i][0]['path']
+                        try:
+                            os.remove(path)
+                            logging.info(f"Removed {path} through skipping functionality")
+                        except Exception as e:
+                            logging.error(f"Issue removing temporary song from storage: {e}")
+                    
+                    # Remove song from queue
+                    self.music_queue.pop(0)
+
+        # Skip currently playing song
         if self.vc != None and self.is_playing == True:
             logging.info("Skipping song by killing ffmpeg process")
             os.system("killall -KILL ffmpeg")
@@ -253,10 +283,11 @@ class MusicCog(commands.Cog):
     @commands.command()
     async def queue(self, ctx):
         queue = ""
-        
+        if self.current_song != None:
+            queue += f"Currently playing: {self.current_song}\n"
         i = 0
         while i <= 20 and i < len(self.music_queue):
-            queue += f"{i}: {self.music_queue[i][0]['title']} \n"
+            queue += f"{i+1}: {self.music_queue[i][0]['title']}\n"
             i += 1
         
         if i == 21:
@@ -272,6 +303,7 @@ class MusicCog(commands.Cog):
 
         self.music_queue = []
         self.skip(ctx)
+        self.current_song = None
 
         # Delete all left over mp3 songs
         for filename in os.listdir('.'):
@@ -284,7 +316,8 @@ class MusicCog(commands.Cog):
     @commands.command(alias=["disconnect", "quit"])
     async def leave(self, *args):
         self.music_queue = []
-        
+        self.current_song = None
+
         # Stop music if playing
         if self.is_playing:  
             logging.info("Stop music by killing all ffmpeg processes")
@@ -354,8 +387,9 @@ class MusicCog(commands.Cog):
         if (not self.is_syncing):
             logging.info("Commenced on demand sync of playlists")
             await ctx.send("Syncing playlists (this may take a while)")
-            thread = threading.Thread(target=self.playlist_sync, daemon=True)
-            thread.start()
+            coroutine = asyncio.to_thread(self.playlist_sync)
+            await coroutine
+            await ctx.send("Playlist sync complete")
         else:
             await ctx.send("Already syncing!")
             logging.warning("Tried syncing when already syncing")
@@ -364,8 +398,8 @@ class MusicCog(commands.Cog):
     async def check_playlists(self):
         logging.info("Commenced scheduled sync of playlists")
         if (not self.is_syncing):
-            thread = threading.Thread(target=self.playlist_sync, daemon=True)
-            thread.start()
+            coroutine = asyncio.to_thread(self.playlist_sync)
+            await coroutine
         else:
             logging.warning("Tried syncing when already syncing")
 
@@ -395,6 +429,11 @@ class MusicCog(commands.Cog):
                         logging.info("Left voice channel automatically")
                         await self.leave(voice)
                         return
+    
+    @commands.Cog.listener()
+    async def on_ready(self):
+        logging.info("Cog loaded")
+        await self.check_playlists.start()
 
 async def setup(bot):
     await bot.add_cog(MusicCog(bot))
