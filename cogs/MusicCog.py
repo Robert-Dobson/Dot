@@ -395,6 +395,9 @@ class MusicCog(commands.Cog):
 
         await self.connected_vc.disconnect()
 
+        # Wait for music and bot to fully stop
+        await asyncio.sleep(5)
+
         # Delete all left over mp3 songs
         for filename in os.listdir("."):
             if filename.endswith(".mp3"):
