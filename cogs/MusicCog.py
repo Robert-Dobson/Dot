@@ -511,10 +511,10 @@ class MusicCog(commands.Cog):
                 await asyncio.sleep(1)
                 time += 1
 
-                if len(self.current_vc.channel.members) >= 2:
+                if len(self.connected_vc.channel.members) >= 2:
                     break
 
-                if time >= 5 and self.current_vc.channel.is_connected():
+                if time >= 5 and self.connected_vc.is_connected():
                     logging.info("Left voice channel automatically")
                     await self.leave(self.connected_vc)
                     return
