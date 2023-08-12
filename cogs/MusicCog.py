@@ -6,7 +6,6 @@ import logging
 import os
 import random
 import re
-import threading
 from yt_dlp import YoutubeDL
 
 SYNC_PLAYLIST_TIME = datetime.time(hour=2, minute=0, tzinfo=datetime.timezone.utc)
@@ -58,7 +57,7 @@ class MusicCog(commands.Cog):
     def query_youtube(self, query, options, should_download, is_playlist):
         # Use YoutubeDL to download the song from YouTube
         with YoutubeDL(options) as ydl:
-            logging.info(f"Searching YouTube for {item}")
+            logging.info(f"Searching YouTube for {query}")
             try:
                 info = ydl.extract_info(query, download=should_download)["entries"]
 
@@ -68,22 +67,8 @@ class MusicCog(commands.Cog):
 
                 return info
             except Exception as e:
-                logging.error(f"Issue downloading {item}: {e}")
+                logging.error(f"Issue downloading {query}: {e}")
                 return None
-
-    def search_youtube(self, item):
-        info = query_youtube(f"ytsearch:{item}", YDL_OPTIONS, True, False)
-        if info != None:
-            logging.info(f"Downloaded (temporarily) {info['title']}")
-
-            # Return song information and path
-            return {
-                "title": info["title"],
-                "path": f"{os.getcwd()}/{info['title']} [{info['id']}].mp3",
-                "delete": True,
-            }
-        else:
-            return False
 
     def playlist_sync(self):
         logging.info("Started local playlist sync")
@@ -97,27 +82,25 @@ class MusicCog(commands.Cog):
                 continue
 
             if playlist[0] in os.listdir("./playlists"):
-                sync_existing_playlist(playlist)
+                self.sync_existing_playlist(playlist)
             else:
-                download_new_playlist(playlist)
+                self.download_new_playlist(playlist)
 
         logging.info("Playlist sync complete")
         self.is_syncing = False
 
-    def sync_existing_playlist(playlist):
+    def sync_existing_playlist(self, playlist):
         # Get metadata of playlist songs from YT
         query = "https://www.youtube.com/playlist?list={playlist[1]}"
-        metadata = query_youtube(query, YDL_OPTIONS_PLAYLIST, False, True)
-        if metadata == None:
+        metadata = self.query_youtube(query, YDL_OPTIONS_PLAYLIST, False, True)
+        if metadata is None:
             logging.error("Issue fetching playlist data for sync")
             return
 
         # Compare local songs to remote songs
         logging.info("Comparing remote playlists to local playlists for sync")
 
-        remote_songs = [
-            [song_info["title"], song_info["id"]] for song_info in remote_songs
-        ]
+        remote_songs = [[song_info["title"], song_info["id"]] for song_info in metadata]
         local_songs = [
             [song, re.findall(".*\[(.*)\].mp3", song)[-1]]
             for song in os.listdir(f"./playlists/{playlist[0]}")
@@ -142,7 +125,7 @@ class MusicCog(commands.Cog):
 
         # Download any missing songs
         if len(missing_songs) > 0:
-            download_missing_songs_in_playlist(missing_songs, playlist[0])
+            self.download_missing_songs_in_playlist(missing_songs, playlist[0])
 
         # Delete any local songs not present on Youtube
         if len(remove_songs) > 0:
@@ -152,7 +135,7 @@ class MusicCog(commands.Cog):
                 if self.delete_song(f"./playlists/{playlist[0]}/{remove_song[0]}"):
                     logging.info(f"Removed {remove_song[0]} from {playlist[0]}")
 
-    def download_new_playlist(playlist):
+    def download_new_playlist(self, playlist):
         logging.info(f"{playlist[0]} playlist doesn't exist, downloading now")
 
         os.mkdir(f"./playlists/{playlist[0]}")
@@ -163,12 +146,12 @@ class MusicCog(commands.Cog):
         download_options["outtmpl"] = song_path_format
 
         query = f"https://www.youtube.com/playlist?list={playlist[1]}"
-        songs = query_youtube(query, download_options, True, True)
+        songs = self.query_youtube(query, download_options, True, True)
 
-        if songs == None:
-            logging.error(f"Issue downloading new playlist from scratch: {e}")
+        if songs is None:
+            logging.error(f"Issue downloading new playlist {playlist[0]} from scratch")
 
-    def download_missing_songs_in_playlist(missing_songs, playlist):
+    def download_missing_songs_in_playlist(self, missing_songs, playlist):
         logging.info(f"Downloading missing songs from {playlist} playlist")
 
         song_path_format = (
@@ -181,15 +164,15 @@ class MusicCog(commands.Cog):
             # Download missing song from youtube
             logging.info(f"Downloading song {song[0]} for playlist:{playlist}")
             query = f"https://www.youtube.com/watch?v={song[1]}"
-            songs = query_youtube(query, download_options, True, True)
-            if songs == None:
+            songs = self.query_youtube(query, download_options, True, True)
+            if songs is None:
                 logging.error(
-                    f"Issue downloading song id: {song[0]} for playlist {playlist}: {e}"
+                    f"Issue downloading song id: {song[0]} for playlist {playlist}"
                 )
 
-    def delete_song(song_path):
+    def delete_song(self, song_path):
         try:
-            os.remove(path)
+            os.remove(song_path)
             return True
         except Exception as e:
             logging.error(f"Issue removing song from storage: {e}")
@@ -200,8 +183,10 @@ class MusicCog(commands.Cog):
             self.is_playing = False
             return
 
+        target_vc = self.music_queue[0][1]
+
         # If not connected to any voice channel
-        if self.connected_vc == None or not self.connected_vc.is_connected():
+        if self.connected_vc is None or not self.connected_vc.is_connected():
             self.connected_vc = await target_vc.connect()
 
         # If in wrong voice channel
@@ -209,9 +194,9 @@ class MusicCog(commands.Cog):
             await self.connected_vc.move_to(target_vc)
 
         # If bot failed to connect to caller's voice channel
-        if self.connected_vc == None:
+        if self.connected_vc is None:
             await ctx.send("Could not connect to the voice channel")
-            log.error("Dot couldn't connect to a voice channel")
+            logging.error("Dot couldn't connect to a voice channel")
             return
 
         # Play Music
@@ -268,10 +253,23 @@ class MusicCog(commands.Cog):
             await ctx.send("Searching for song, this might take a while!")
 
             # Find song on YouTube in a thread
-            coroutine = asyncio.to_thread(self.search_youtube, query)
-            song = await coroutine
+            coroutine = asyncio.to_thread(
+                self.query_youtube, f"ytsearch:{query}", YDL_OPTIONS, True, False
+            )
+            info = await coroutine
 
-            if song == False:
+            song = None
+            if info is not None:
+                logging.info(f"Downloaded (temporarily) {info['title']}")
+
+                # Return song information and path
+                song = {
+                    "title": info["title"],
+                    "path": f"{os.getcwd()}/{info['title']} [{info['id']}].mp3",
+                    "delete": True,
+                }
+
+            if song is None:
                 await ctx.send("Could not find the song. Please try again")
                 return
 
@@ -281,7 +279,7 @@ class MusicCog(commands.Cog):
         if len(self.music_queue) == 0:
             await ctx.send("No music in queue!")
         else:
-            if self.is_playing == False:
+            if self.is_playing is False:
                 await self.start_music(ctx)
 
     @commands.command()
@@ -341,7 +339,7 @@ class MusicCog(commands.Cog):
                 self.music_queue.pop(0)
 
         # Skip currently playing song
-        if self.connected_vc != None and self.is_playing == True:
+        if self.connected_vc is not None and self.is_playing is True:
             logging.info("Skipping song by killing ffmpeg process")
             os.system("killall -KILL ffmpeg")
         else:
@@ -352,7 +350,7 @@ class MusicCog(commands.Cog):
         queue = ""
 
         # Create queue list
-        if self.current_song != None:
+        if self.current_song is not None:
             queue += f"Currently playing: {self.current_song}\n"
 
         i = 0
@@ -493,7 +491,7 @@ class MusicCog(commands.Cog):
             return
 
         # If bot isn't connected to the channel moved from
-        if self.connected_vc == None:
+        if self.connected_vc is None:
             return
 
         bot_channel = self.connected_vc.channel.guild.id
@@ -504,18 +502,18 @@ class MusicCog(commands.Cog):
             return
 
         # Leave if alone for more than 5s before finally leaving
-        if len(voice.channel.members) <= 1:
+        if len(self.connected_vc.channel.members) <= 1:
             time = 0
             while True:
                 await asyncio.sleep(1)
                 time += 1
 
-                if len(voice.channel.members) >= 2 or not voice.is_connected():
+                if len(self.current_vc.channel.members) >= 2:
                     break
 
-                if time >= 5:
+                if time >= 5 and self.current_vc.channel.is_connected():
                     logging.info("Left voice channel automatically")
-                    await self.leave(voice)
+                    await self.leave(self.connected_vc)
                     return
 
     @commands.Cog.listener()
