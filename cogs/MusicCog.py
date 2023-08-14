@@ -539,8 +539,8 @@ class MusicCog(commands.Cog):
         if member.id == self.bot.user.id:
             return
 
-        # If bot isn't connected to the channel moved from
-        if self.connected_vc is None:
+        # If bot isn't connected or nobody left a channel
+        if self.connected_vc is None or before is None:
             return
 
         bot_channel = self.connected_vc.channel.guild.id
