@@ -32,6 +32,7 @@ YDL_OPTIONS_PLAYLIST = {
         }
     ],
     "logger": logging,
+    "no-abort-on-error": True,
 }
 
 
@@ -91,7 +92,7 @@ class MusicCog(commands.Cog):
 
     def sync_existing_playlist(self, playlist):
         # Get metadata of playlist songs from YT
-        query = "https://www.youtube.com/playlist?list={playlist[1]}"
+        query = f"https://www.youtube.com/playlist?list={playlist[1]}"
         metadata = self.query_youtube(query, YDL_OPTIONS_PLAYLIST, False, True)
         if metadata is None:
             logging.error("Issue fetching playlist data for sync")
@@ -102,8 +103,9 @@ class MusicCog(commands.Cog):
 
         remote_songs = [[song_info["title"], song_info["id"]] for song_info in metadata]
         local_songs = [
-            [song, re.findall(".*\[(.*)\].mp3", song)[-1]]
+            [song, re.findall(".*\[(.*)\].mp3", song)[0]]
             for song in os.listdir(f"./playlists/{playlist[0]}")
+            if song.endswith(".mp3")
         ]
 
         # Songs not in local but are in remote
