@@ -20,7 +20,7 @@ YDL_OPTIONS = {
             "preferredquality": "192",
         }
     ],
-    "quiet": True,
+    "logger": logging,
 }
 YDL_OPTIONS_PLAYLIST = {
     "format": "bestaudio/best",
@@ -31,7 +31,7 @@ YDL_OPTIONS_PLAYLIST = {
             "preferredquality": "192",
         }
     ],
-    "quiet": True,
+    "logger": logging,
 }
 
 
