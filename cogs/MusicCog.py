@@ -452,7 +452,7 @@ class MusicCog(commands.Cog):
     @playlist.command(
         brief="Adds songs from playlist to queue (usage /playlist p  <playlist-name>)",
         description="Adds all songs in given local playlist to queue \n"
-        "Arugments: <playlist-name> - name of the local playlist to play",
+        "Arguments: <playlist-name> - name of the local playlist to play",
     )
     async def p(self, ctx, *args):
         query = " ".join(args)
@@ -508,7 +508,7 @@ class MusicCog(commands.Cog):
         description="Synchronises given playlist with remote YouTube playlist."
         "Downloads songs that aren't avaliable locally and deletes songs"
         " not avaliable remotely \n"
-        "Arugments: <playlist-name> - name of the local playlist to play",
+        "Arguments: <playlist-name> - name of the local playlist to play",
     )
     async def sync(self, ctx):
         if not self.is_syncing:
