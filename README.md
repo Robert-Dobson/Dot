@@ -21,8 +21,10 @@ Dot is my personal Discord bot written in Python that allows users to play music
 - `/playlist list` - Lists all avaliable playlists
 
 ## Dependencies
-- `discord.py` - Python library to access Discord that can be installed using `pip`
-- `yt_dlp` - Python library to access Youtube that can be installed using `pip`
-- `dotenv` - Python library to access enviornment variables (discord token) that can be installed using `pip`
-- `FFmpeg` - Multimedia framework to stream music - https://ffmpeg.org/about.html
+Python libraries can be installed using the `requirements.txt` provided in this repo:
+```bash
+python -m pip install -r requirements.txt
+```
+
+You must also install `FFmpeg` (Multimedia framework to stream music) - https://ffmpeg.org/about.html. Make sure this is in your PATH.
 
