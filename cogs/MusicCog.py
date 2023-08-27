@@ -236,15 +236,11 @@ class MusicCog(commands.Cog):
 
         self.play_next()
 
-    @commands.command(
+    @commands.hybrid_command(
         brief="Plays the requested song (usage: /play <song-name>)",
-        description="Searches Youtube for the music that best matches "
-        "the query and adds it to the queue to play in "
-        "your current channel \n Arguments: <song-name>",
+        description="Plays requested song from YouTube",
     )
-    async def play(self, ctx, *song_query):
-        query = " ".join(song_query)
-
+    async def play(self, ctx, song_query):
         # Get caller's voice channel
         caller_vc = ctx.author.voice.channel if ctx.author.voice else None
         if caller_vc is None:
@@ -256,12 +252,12 @@ class MusicCog(commands.Cog):
             await self.resume(ctx)
             return
 
-        if query != " ":
+        if song_query != " ":
             await ctx.send("Searching for song, this might take a while!")
 
             # Find song on YouTube in a thread
             coroutine = asyncio.to_thread(
-                self.query_youtube, f"ytsearch:{query}", YDL_OPTIONS, True, False
+                self.query_youtube, f"ytsearch:{song_query}", YDL_OPTIONS, True, False
             )
             info = await coroutine
 
@@ -289,7 +285,7 @@ class MusicCog(commands.Cog):
             if self.is_playing is False:
                 await self.start_music(ctx)
 
-    @commands.command(
+    @commands.hybrid_command(
         brief="Pauses the currently playing song (usage: /pause)",
         description="Pauses the currently playing song",
     )
@@ -301,7 +297,7 @@ class MusicCog(commands.Cog):
         else:
             await ctx.send("Music already paused!")
 
-    @commands.command(
+    @commands.hybrid_command(
         brief="Resumes the currently playing song if paused (usage: /resume)",
         description="Resumes the currently playing song if paused",
     )
@@ -313,23 +309,15 @@ class MusicCog(commands.Cog):
         else:
             await ctx.send("No music is paused!")
 
-    @commands.command(
-        brief="Skips the current song (usage: /skip optional:<num-of-songs-to-skip>)",
-        description="Skips the currently playing song or the number of songs"
-        "specified.\n Arguments: Optional argument <num-of-songs-to-skip>"
-        "- Skip given number of songs (corresponds to queue number)",
+    @commands.hybrid_command(
+        brief="Skips the current song (usage: /skip <num-of-songs-to-skip>)",
+        description="Skips specified number of songs songs",
     )
-    async def skip(self, ctx, *args):
-        num_to_skip = 1
-
-        if len(args) == 1:
-            if args[0].isnumeric():
-                num_to_skip = int(args[0])
-            else:
-                await ctx.send("Enter an integer number to skip n songs")
-                return
-        elif len(args) > 1:
-            await ctx.send("Too many arguments!")
+    async def skip(self, ctx, num):
+        if num.isnumeric():
+            num_to_skip = int(num[0])
+        else:
+            await ctx.send("Enter an integer number to skip n songs")
             return
 
         if not self.is_playing:
@@ -362,8 +350,11 @@ class MusicCog(commands.Cog):
             os.system("killall -KILL ffmpeg")
         else:
             await ctx.send("Not playing any music!")
+            return
 
-    @commands.command(
+        await ctx.send(f"Skipped {num} songs")
+
+    @commands.hybrid_command(
         brief="Displays next 20 songs in queue (and current song) (usage: /queue)",
         description="Displays next 20 songs in queue (and current song)",
     )
@@ -387,10 +378,9 @@ class MusicCog(commands.Cog):
         else:
             await ctx.send("No music in the queue!")
 
-    @commands.command(
+    @commands.hybrid_command(
         brief="Removes all songs from the queue (usage: /clear)",
-        description="Removes all songs from the queue (current song is unaffected)."
-        " Also deletes any temporary songs no longer used",
+        description="Removes all songs from the queue (current song is unaffected)",
     )
     async def clear(self, ctx):
         self.music_queue = []
@@ -405,11 +395,10 @@ class MusicCog(commands.Cog):
 
         await ctx.send("Music queue is cleared!")
 
-    @commands.command(
+    @commands.hybrid_command(
         alias=["disconnect", "quit"],
         brief="Disconnects bot from voice channel (usage: /leave)",
-        description="Disconnects bot from voice channel. Also clears current queue "
-        "and deletes any temporary songs in queue from storage",
+        description="Disconnects bot from voice channel",
     )
     async def leave(self, ctx):
         self.music_queue = []
@@ -433,8 +422,10 @@ class MusicCog(commands.Cog):
             if filename.endswith(".mp3"):
                 if self.delete_song(filename):
                     logging.info(f"Removed {filename} as part of bot leaving")
+        
+        await ctx.send("Bot is now disconnected")
 
-    @commands.command(
+    @commands.hybrid_command(
         brief="Shuffles current queue (usage: /shuffle)",
         description="Shuffles current queue",
     )
@@ -442,7 +433,7 @@ class MusicCog(commands.Cog):
         random.shuffle(self.music_queue)
         await ctx.send("Playlist shuffled!")
 
-    @commands.group(
+    @commands.hybrid_group(
         brief="Group of commands related to playlists",
     )
     async def playlist(self, ctx):
@@ -451,31 +442,28 @@ class MusicCog(commands.Cog):
 
     @playlist.command(
         brief="Adds songs from playlist to queue (usage /playlist p  <playlist-name>)",
-        description="Adds all songs in given local playlist to queue \n"
-        "Arguments: <playlist-name> - name of the local playlist to play",
+        description="Adds all songs in given local playlist to queue",
     )
-    async def p(self, ctx, *args):
-        query = " ".join(args)
-
+    async def p(self, ctx, playlist_name):
         # Get users voice channel
         voice_channel = ctx.author.voice.channel if ctx.author.voice else None
         if voice_channel is None:
             await ctx.send("Connect to a voice channel!")
             return
 
-        if query == " ":
+        if playlist_name == " ":
             await ctx.send("Must provide a playlist name!")
             return
 
-        if query not in os.listdir("./playlists"):
-            await ctx.send(f"{query} is not a playlist!")
+        if playlist_name not in os.listdir("./playlists"):
+            await ctx.send(f"{playlist_name} is not a playlist!")
             return
 
         # add songs to list
-        for song in os.listdir(f"./playlists/{query}"):
+        for song in os.listdir(f"./playlists/{playlist_name}"):
             song = {
                 "title": song[:-4],
-                "path": f"./playlists/{query}/{song}",
+                "path": f"./playlists/{playlist_name}/{song}",
                 "delete": False,
             }
             self.music_queue.append([song, voice_channel])
@@ -484,8 +472,8 @@ class MusicCog(commands.Cog):
         random.shuffle(self.music_queue)
 
         # Start playing songs
-        await ctx.send(f"Playlist {query} has been added to the queue!")
-        logging.info(f"Added playlist {query} to the queue")
+        await ctx.send(f"Playlist {playlist_name} has been added to the queue!")
+        logging.info(f"Added playlist {playlist_name} to the queue")
         await self.start_music(ctx)
 
     @playlist.command(
@@ -505,10 +493,7 @@ class MusicCog(commands.Cog):
 
     @playlist.command(
         brief="Synchronises given playlist (usage: /playlist sync <playlist-name>)",
-        description="Synchronises given playlist with remote YouTube playlist."
-        "Downloads songs that aren't avaliable locally and deletes songs"
-        " not avaliable remotely \n"
-        "Arguments: <playlist-name> - name of the local playlist to play",
+        description="Synchronises given playlist with remote YouTube playlist.",
     )
     async def sync(self, ctx):
         if not self.is_syncing:
