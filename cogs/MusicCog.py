@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 import logging
 import os
@@ -180,7 +181,7 @@ class MusicCog(commands.Cog):
             logging.error(f"Issue removing song from storage: {e}")
             return False
 
-    async def start_music(self, ctx):
+    async def start_music(self, interaction):
         if len(self.music_queue) == 0:
             self.is_playing = False
             return
@@ -197,7 +198,9 @@ class MusicCog(commands.Cog):
 
         # If bot failed to connect to caller's voice channel
         if self.connected_vc is None:
-            await ctx.send("Could not connect to the voice channel")
+            await interaction.response.send_message(
+                "Could not connect to the voice channel"
+            )
             logging.error("Dot couldn't connect to a voice channel")
             return
 
@@ -236,24 +239,23 @@ class MusicCog(commands.Cog):
 
         self.play_next()
 
-    @commands.hybrid_command(
-        brief="Plays the requested song (usage: /play <song-name>)",
-        description="Plays requested song from YouTube",
-    )
-    async def play(self, ctx, song_query):
+    @app_commands.command(description="Plays requested song from YouTube")
+    async def play(self, interaction, song_query: str):
+        response = interaction.response
+
         # Get caller's voice channel
-        caller_vc = ctx.author.voice.channel if ctx.author.voice else None
+        caller_vc = interaction.user.voice.channel if interaction.user.voice else None
         if caller_vc is None:
-            await ctx.send("Connect to a voice channel!")
+            await response.send_message("Connect to a voice channel!")
             return
 
         # TODO: Consider what if dot is paused in different channel
         if self.is_paused:
-            await self.resume(ctx)
+            await self.resume(interaction)
             return
 
         if song_query != " ":
-            await ctx.send("Searching for song, this might take a while!")
+            await response.send_message("Searching for song, this might take a while!")
 
             # Find song on YouTube in a thread
             coroutine = asyncio.to_thread(
@@ -273,64 +275,54 @@ class MusicCog(commands.Cog):
                 }
 
             if song is None:
-                await ctx.send("Could not find the song. Please try again")
+                await response.send_message("Could not find the song. Please try again")
                 return
 
-            await ctx.send(f"Song, {song['title']}, added to the queue")
+            await response.send_message(f"Song, {song['title']}, added to the queue")
             self.music_queue.append([song, caller_vc])
 
         if len(self.music_queue) == 0:
-            await ctx.send("No music in queue!")
+            await response.send_message("No music in queue!")
         else:
             if self.is_playing is False:
-                await self.start_music(ctx)
+                await self.start_music(interaction)
 
-    @commands.hybrid_command(
-        brief="Pauses the currently playing song (usage: /pause)",
-        description="Pauses the currently playing song",
-    )
-    async def pause(self, ctx):
+    @app_commands.command(description="Pauses the currently playing song")
+    async def pause(self, interaction):
         if self.is_playing:
             self.is_playing = False
             self.is_paused = True
             self.connected_vc.pause()
         else:
-            await ctx.send("Music already paused!")
+            await interaction.response.send_message("Music already paused!")
 
-    @commands.hybrid_command(
-        brief="Resumes the currently playing song if paused (usage: /resume)",
-        description="Resumes the currently playing song if paused",
-    )
-    async def resume(self, ctx):
+    @app_commands.command(description="Resumes the currently playing song if paused")
+    async def resume(self, interaction):
         if self.is_paused:
             self.is_playing = True
             self.is_paused = False
             self.connected_vc.resume()
         else:
-            await ctx.send("No music is paused!")
+            await interaction.response.send_message("No music is paused!")
 
-    @commands.hybrid_command(
-        brief="Skips the current song (usage: /skip <num-of-songs-to-skip>)",
-        description="Skips specified number of songs songs",
-    )
-    async def skip(self, ctx, num):
-        if num.isnumeric():
-            num_to_skip = int(num[0])
-        else:
-            await ctx.send("Enter an integer number to skip n songs")
-            return
+    @app_commands.command(description="Skips specified number of songs songs")
+    async def skip(self, interaction, num_to_skip: int):
+        response = interaction.response
 
         if not self.is_playing:
-            await ctx.send("No song is currently playing")
+            await response.send_message("No song is currently playing")
             return
 
         if self.is_paused:
-            await ctx.send("Dot is currently paused")
+            await response.send_message("Dot is currently paused")
             return
+
+        if num_to_skip < 1:
+            await response.send_message("Must skip 1 or more songs")
 
         if num_to_skip > 1:
             if len(self.music_queue) < num_to_skip:
-                await ctx.send("There's not enough songs in the queue")
+                await response.send("There's not enough songs in the queue")
                 return
 
             # Remove n-1 songs from queue
@@ -349,16 +341,15 @@ class MusicCog(commands.Cog):
             logging.info("Skipping song by killing ffmpeg process")
             os.system("killall -KILL ffmpeg")
         else:
-            await ctx.send("Not playing any music!")
+            await response.send_message("Not playing any music!")
             return
 
-        await ctx.send(f"Skipped {num} songs")
+        await response.send_message(f"Skipped {num_to_skip} songs")
 
-    @commands.hybrid_command(
-        brief="Displays next 20 songs in queue (and current song) (usage: /queue)",
-        description="Displays next 20 songs in queue (and current song)",
+    @app_commands.command(
+        description="Displays next 20 songs in queue (and current song)"
     )
-    async def queue(self, ctx):
+    async def queue(self, interaction):
         queue = ""
 
         # Create queue list
@@ -374,17 +365,16 @@ class MusicCog(commands.Cog):
             queue += "..."
 
         if queue != "":
-            await ctx.send(queue)
+            await interaction.response.send_message(queue)
         else:
-            await ctx.send("No music in the queue!")
+            await interaction.response.send_message("No music in the queue!")
 
-    @commands.hybrid_command(
-        brief="Removes all songs from the queue (usage: /clear)",
-        description="Removes all songs from the queue (current song is unaffected)",
+    @app_commands.command(
+        description="Removes all songs from the queue (current song is unaffected)"
     )
-    async def clear(self, ctx):
+    async def clear(self, interaction):
         self.music_queue = []
-        self.skip(ctx)
+        self.skip(interaction)
         self.current_song = None
 
         # Delete all left over mp3 songs
@@ -393,14 +383,10 @@ class MusicCog(commands.Cog):
                 if self.delete_song(filename):
                     logging.info(f"Removed {filename} as part of clearing queue")
 
-        await ctx.send("Music queue is cleared!")
+        await interaction.response.send_message("Music queue is cleared!")
 
-    @commands.hybrid_command(
-        alias=["disconnect", "quit"],
-        brief="Disconnects bot from voice channel (usage: /leave)",
-        description="Disconnects bot from voice channel",
-    )
-    async def leave(self, ctx):
+    @app_commands.command(description="Disconnects bot from voice channel")
+    async def leave(self, interaction):
         self.music_queue = []
         self.current_song = None
 
@@ -422,41 +408,32 @@ class MusicCog(commands.Cog):
             if filename.endswith(".mp3"):
                 if self.delete_song(filename):
                     logging.info(f"Removed {filename} as part of bot leaving")
-        
-        await ctx.send("Bot is now disconnected")
 
-    @commands.hybrid_command(
-        brief="Shuffles current queue (usage: /shuffle)",
-        description="Shuffles current queue",
-    )
-    async def shuffle(self, ctx):
+        if interaction is not None:
+            await interaction.response.send_message("Bot is now disconnected")
+
+    @app_commands.command(description="Shuffles current queue")
+    async def shuffle(self, interaction):
         random.shuffle(self.music_queue)
-        await ctx.send("Playlist shuffled!")
+        await interaction.response.send_message("Playlist shuffled!")
 
-    @commands.hybrid_group(
-        brief="Group of commands related to playlists",
-    )
-    async def playlist(self, ctx):
-        if ctx.invoked_subcommand is None:
-            await ctx.send("Invalid playlist command. Use p (for play) or list")
+    @app_commands.command(description="Adds all songs in given local playlist to queue")
+    async def playlist_play(self, interaction, playlist_name: str):
+        response = interaction.response
 
-    @playlist.command(
-        brief="Adds songs from playlist to queue (usage /playlist p  <playlist-name>)",
-        description="Adds all songs in given local playlist to queue",
-    )
-    async def p(self, ctx, playlist_name):
         # Get users voice channel
-        voice_channel = ctx.author.voice.channel if ctx.author.voice else None
+        voice = interaction.user.voice
+        voice_channel = voice.channel if voice else None
         if voice_channel is None:
-            await ctx.send("Connect to a voice channel!")
+            await response.send_message("Connect to a voice channel!")
             return
 
         if playlist_name == " ":
-            await ctx.send("Must provide a playlist name!")
+            await response.send_message("Must provide a playlist name!")
             return
 
         if playlist_name not in os.listdir("./playlists"):
-            await ctx.send(f"{playlist_name} is not a playlist!")
+            await response.send_message(f"{playlist_name} is not a playlist!")
             return
 
         # add songs to list
@@ -472,30 +449,28 @@ class MusicCog(commands.Cog):
         random.shuffle(self.music_queue)
 
         # Start playing songs
-        await ctx.send(f"Playlist {playlist_name} has been added to the queue!")
+        await response.send_message(
+            f"Playlist {playlist_name} has been added to the queue!"
+        )
         logging.info(f"Added playlist {playlist_name} to the queue")
-        await self.start_music(ctx)
+        await self.start_music(interaction)
 
-    @playlist.command(
-        brief="Lists all avaliable local playlists (usage /playlist list)",
-        description="Lists all avaliable local playlists",
-    )
-    async def list(self, ctx):
+    @app_commands.command(description="Lists all avaliable local playlists")
+    async def playlist_list(self, interaction):
         # List all avaliable local playlists
         list = ""
         for i, playlist in enumerate(os.listdir("./playlists")):
             list += f"{i}: {playlist} \n"
 
         if list == "":
-            await ctx.send("No playlists found!")
+            await interaction.response.send_message("No playlists found!")
         else:
-            await ctx.send(list)
+            await interaction.response.send_message(list)
 
-    @playlist.command(
-        brief="Synchronises given playlist (usage: /playlist sync <playlist-name>)",
-        description="Synchronises given playlist with remote YouTube playlist.",
+    @app_commands.command(
+        description="Synchronises given playlist with remote YouTube playlist."
     )
-    async def sync(self, ctx):
+    async def sync_playlists(self, ctx):
         if not self.is_syncing:
             logging.info("Commenced on demand sync of playlists")
             await ctx.send("Syncing playlists (this may take a while)")
