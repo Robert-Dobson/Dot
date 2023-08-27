@@ -239,6 +239,29 @@ class MusicCog(commands.Cog):
 
         self.play_next()
 
+    async def leave_channel(self):
+        self.music_queue = []
+        self.current_song = None
+
+        # Stop music if playing
+        if self.is_playing:
+            logging.info("Stop music by killing all ffmpeg processes")
+            os.system("killall -KILL ffmpeg")
+
+        self.is_playing = False
+        self.is_paused = False
+
+        await self.connected_vc.disconnect()
+
+        # Wait for music and bot to fully stop
+        await asyncio.sleep(5)
+
+        # Delete all left over mp3 songs
+        for filename in os.listdir("."):
+            if filename.endswith(".mp3"):
+                if self.delete_song(filename):
+                    logging.info(f"Removed {filename} as part of bot leaving")
+
     @app_commands.command(description="Plays requested song from YouTube")
     async def play(self, interaction, song_query: str):
         response = interaction.response
@@ -387,30 +410,8 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(description="Disconnects bot from voice channel")
     async def leave(self, interaction):
-        self.music_queue = []
-        self.current_song = None
-
-        # Stop music if playing
-        if self.is_playing:
-            logging.info("Stop music by killing all ffmpeg processes")
-            os.system("killall -KILL ffmpeg")
-
-        self.is_playing = False
-        self.is_paused = False
-
-        await self.connected_vc.disconnect()
-
-        # Wait for music and bot to fully stop
-        await asyncio.sleep(5)
-
-        # Delete all left over mp3 songs
-        for filename in os.listdir("."):
-            if filename.endswith(".mp3"):
-                if self.delete_song(filename):
-                    logging.info(f"Removed {filename} as part of bot leaving")
-
-        if interaction is not None:
-            await interaction.response.send_message("Bot is now disconnected")
+        await self.leave_channel()
+        await interaction.response.send_message("Bot is now disconnected")
 
     @app_commands.command(description="Shuffles current queue")
     async def shuffle(self, interaction):
@@ -524,7 +525,7 @@ class MusicCog(commands.Cog):
 
                 if time >= 5 and self.connected_vc.is_connected():
                     logging.info("Left voice channel automatically")
-                    await self.leave(self.connected_vc)
+                    await self.leave_channel()
                     return
 
     @commands.Cog.listener()
