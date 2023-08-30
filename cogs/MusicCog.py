@@ -345,7 +345,7 @@ class MusicCog(commands.Cog):
 
         if num_to_skip > 1:
             if len(self.music_queue) < num_to_skip:
-                await response.send("There's not enough songs in the queue")
+                await response.send_message("There's not enough songs in the queue")
                 return
 
             # Remove n-1 songs from queue
@@ -471,17 +471,18 @@ class MusicCog(commands.Cog):
     @app_commands.command(
         description="Synchronises given playlist with remote YouTube playlist."
     )
-    async def sync_playlists(self, ctx):
+    async def sync_playlists(self, interaction):
+        response = interaction.response
         if not self.is_syncing:
             logging.info("Commenced on demand sync of playlists")
-            await ctx.send("Syncing playlists (this may take a while)")
+            await response.send_message("Syncing playlists (this may take a while)")
 
             coroutine = asyncio.to_thread(self.playlist_sync)
             await coroutine
 
-            await ctx.send("Playlist sync complete")
+            await response.send.send_message("Playlist sync complete")
         else:
-            await ctx.send("Already syncing!")
+            await response.send_message("Already syncing!")
             logging.warning("Tried syncing when already syncing")
 
     @tasks.loop(time=SYNC_PLAYLIST_TIME)
