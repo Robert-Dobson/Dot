@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import logging
 import os
+import psutil
 import random
 import re
 from yt_dlp import YoutubeDL
@@ -181,6 +182,11 @@ class MusicCog(commands.Cog):
             logging.error(f"Issue removing song from storage: {e}")
             return False
 
+    def kill_process(self, proc_name="ffmpeg"):
+        for proc in psutil.process_iter():
+            if proc.name() == proc_name:
+                proc.kill()
+
     async def start_music(self, interaction):
         if len(self.music_queue) == 0:
             self.is_playing = False
@@ -246,7 +252,7 @@ class MusicCog(commands.Cog):
         # Stop music if playing
         if self.is_playing:
             logging.info("Stop music by killing all ffmpeg processes")
-            os.system("killall -KILL ffmpeg")
+            self.kill_process()
 
         self.is_playing = False
         self.is_paused = False
@@ -362,7 +368,7 @@ class MusicCog(commands.Cog):
         # Skip currently playing song
         if self.connected_vc is not None and self.is_playing is True:
             logging.info("Skipping song by killing ffmpeg process")
-            os.system("killall -KILL ffmpeg")
+            self.kill_process()
         else:
             await response.send_message("Not playing any music!")
             return

@@ -1,4 +1,5 @@
 discord.py
-yt_dlp
-python-dotenv
+psutil
 PyNaCl
+python-dotenv
+yt_dlp
