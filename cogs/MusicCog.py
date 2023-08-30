@@ -58,9 +58,16 @@ class MusicCog(commands.Cog):
         self.check_playlists.cancel()
 
     def query_youtube(self, query, options, should_download, is_playlist):
+        # Speed up playlist extraction when its not being downloaded
+        if is_playlist and not should_download:
+            options = dict(options)
+            options['flat-playlist'] = True
+
+
         # Use YoutubeDL to download the song from YouTube
         with YoutubeDL(options) as ydl:
             logging.info(f"Searching YouTube for {query}")
+
             try:
                 info = ydl.extract_info(query, download=should_download)["entries"]
 
