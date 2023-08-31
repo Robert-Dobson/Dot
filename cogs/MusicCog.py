@@ -211,7 +211,7 @@ class MusicCog(commands.Cog):
 
         # If bot failed to connect to caller's voice channel
         if self.connected_vc is None:
-            await interaction.response.send_message(
+            await interaction.channel.send(
                 "Could not connect to the voice channel"
             )
             logging.error("Dot couldn't connect to a voice channel")
@@ -277,12 +277,11 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(description="Plays requested song from YouTube")
     async def play(self, interaction, song_query: str):
-        response = interaction.response
 
         # Get caller's voice channel
         caller_vc = interaction.user.voice.channel if interaction.user.voice else None
         if caller_vc is None:
-            await response.send_message("Connect to a voice channel!")
+            await interaction.response.send_message("Connect to a voice channel!")
             return
 
         # TODO: Consider what if dot is paused in different channel
@@ -291,7 +290,7 @@ class MusicCog(commands.Cog):
             return
 
         if song_query != " ":
-            await response.send_message("Searching for song, this might take a while!")
+            await interaction.response.send_message("Searching for song, this might take a while!")
 
             # Find song on YouTube in a thread
             coroutine = asyncio.to_thread(
@@ -311,14 +310,14 @@ class MusicCog(commands.Cog):
                 }
 
             if song is None:
-                await response.send_message("Could not find the song. Please try again")
+                await interaction.followup.send("Could not find the song. Please try again")
                 return
 
-            await response.send_message(f"Song, {song['title']}, added to the queue")
+            await interaction.followup.send(f"Song, {song['title']}, added to the queue")
             self.music_queue.append([song, caller_vc])
 
         if len(self.music_queue) == 0:
-            await response.send_message("No music in queue!")
+            await interaction.response.send_message("No music in queue!")
         else:
             if self.is_playing is False:
                 await self.start_music(interaction)
@@ -355,6 +354,7 @@ class MusicCog(commands.Cog):
 
         if num_to_skip < 1:
             await response.send_message("Must skip 1 or more songs")
+            return
 
         if num_to_skip > 1:
             if len(self.music_queue) < num_to_skip:
@@ -410,7 +410,7 @@ class MusicCog(commands.Cog):
     )
     async def clear(self, interaction):
         self.music_queue = []
-        self.skip(interaction)
+        self.kill_process() # Skip any songs if playing
         self.current_song = None
 
         # Delete all left over mp3 songs
@@ -493,7 +493,7 @@ class MusicCog(commands.Cog):
             coroutine = asyncio.to_thread(self.playlist_sync)
             await coroutine
 
-            await response.send_message("Playlist sync complete")
+            await interaction.followup.send("Playlist sync complete")
         else:
             await response.send_message("Already syncing!")
             logging.warning("Tried syncing when already syncing")
