@@ -493,7 +493,7 @@ class MusicCog(commands.Cog):
             coroutine = asyncio.to_thread(self.playlist_sync)
             await coroutine
 
-            await response.send.send_message("Playlist sync complete")
+            await response.send_message("Playlist sync complete")
         else:
             await response.send_message("Already syncing!")
             logging.warning("Tried syncing when already syncing")
