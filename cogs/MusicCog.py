@@ -76,8 +76,8 @@ class MusicCog(commands.Cog):
                     info = info[0]
 
                 return info
-            except Exception as e:
-                logging.error(f"Issue downloading {query}: {e}")
+            except:
+                logging.exception(f"Issue downloading {query}")
                 return None
 
     def playlist_sync(self):
@@ -185,8 +185,8 @@ class MusicCog(commands.Cog):
         try:
             os.remove(song_path)
             return True
-        except Exception as e:
-            logging.error(f"Issue removing song from storage: {e}")
+        except:
+            logging.exception("Issue removing song from storage")
             return False
 
     def kill_process(self, proc_name="ffmpeg"):
