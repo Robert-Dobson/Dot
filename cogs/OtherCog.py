@@ -8,15 +8,11 @@ class OtherCog(commands.Cog):
         super().__init__()
         self.bot = bot
 
-    @app_commands.command(
-        description="Replies with test message",
-    )
+    @app_commands.command(description="Replies with test message")
     async def test(self, interaction):
         await interaction.response.send_message("Testing 123")
 
-    @app_commands.command(
-        description="Generates a random number from 1 to n",
-    )
+    @app_commands.command(description="Generates a random number from 1 to n")
     async def random(self, interaction, num: int):
         if num <= 0:
             await interaction.response.send_message(
@@ -27,6 +23,11 @@ class OtherCog(commands.Cog):
         await interaction.response.send_message(
             f"Random number is: {rand.randint(1, num)}"
         )
+
+    @app_commands.command(description="Replies with what you enter")
+    async def echo(self, interaction, msg: str):
+        await interaction.response.send_message("Message recieved", ephemeral=True)
+        await interaction.channel.send(msg)
 
     @commands.command()
     async def sync_slash_commands(self, ctx):
