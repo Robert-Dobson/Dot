@@ -305,7 +305,7 @@ class MusicCog(commands.Cog):
                 # Return song information and path
                 song = {
                     "title": info["title"],
-                    "path": f"{os.getcwd()}/{info['title']} [{info['id']}].mp3",
+                    "path": f"{info['title']} [{info['id']}].mp3",
                     "delete": True,
                 }
 
