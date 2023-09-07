@@ -112,3 +112,5 @@ GitHub.sublime-settings
 *.ytdl
 *.part
 .playlists/
+*.json
+ 

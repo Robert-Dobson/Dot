@@ -3,6 +3,7 @@ import datetime
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+import json
 import logging
 import os
 import psutil
@@ -61,8 +62,7 @@ class MusicCog(commands.Cog):
         # Speed up playlist extraction when its not being downloaded
         if is_playlist and not should_download:
             options = dict(options)
-            options['flat-playlist'] = True
-
+            options["flat-playlist"] = True
 
         # Use YoutubeDL to download the song from YouTube
         with YoutubeDL(options) as ydl:
@@ -85,23 +85,24 @@ class MusicCog(commands.Cog):
         self.is_syncing = True
 
         # Get YT playlist information from `.env`
-        playlists = [elem.split(":") for elem in os.getenv("playlists").split("/")]
+        with open("playlists.json") as f:
+            playlists = json.load(f)["playlists"]
 
-        for playlist in playlists:
-            if playlist == [""]:
+        for playlist_name in playlists:
+            if playlist_name == "":
                 continue
 
-            if playlist[0] in os.listdir("./playlists"):
-                self.sync_existing_playlist(playlist)
+            if playlist_name in os.listdir("./playlists"):
+                self.sync_existing_playlist(playlist_name, playlists[playlist_name])
             else:
-                self.download_new_playlist(playlist)
+                self.download_new_playlist(playlist_name, playlists[playlist_name])
 
         logging.info("Playlist sync complete")
         self.is_syncing = False
 
-    def sync_existing_playlist(self, playlist):
+    def sync_existing_playlist(self, playlist_name, playlist_link):
         # Get metadata of playlist songs from YT
-        query = f"https://www.youtube.com/playlist?list={playlist[1]}"
+        query = f"https://www.youtube.com/playlist?list={playlist_link}"
         metadata = self.query_youtube(query, YDL_OPTIONS_PLAYLIST, False, True)
         if metadata is None:
             logging.error("Issue fetching playlist data for sync")
@@ -113,7 +114,7 @@ class MusicCog(commands.Cog):
         remote_songs = [[song_info["title"], song_info["id"]] for song_info in metadata]
         local_songs = [
             [song, re.findall(".*\[(.*)\].mp3", song)[0]]
-            for song in os.listdir(f"./playlists/{playlist[0]}")
+            for song in os.listdir(f"./playlists/{playlist_name}")
             if song.endswith(".mp3")
         ]
 
@@ -131,54 +132,56 @@ class MusicCog(commands.Cog):
             if song[1] not in [sublist[1] for sublist in remote_songs]
         ]
 
-        logging.info(f"{playlist[0]} has {len(missing_songs)} missing songs")
-        logging.info(f"{playlist[0]} has {len(remove_songs)} songs to remove")
+        logging.info(f"{playlist_name} has {len(missing_songs)} missing songs")
+        logging.info(f"{playlist_name} has {len(remove_songs)} songs to remove")
 
         # Download any missing songs
         if len(missing_songs) > 0:
-            self.download_missing_songs_in_playlist(missing_songs, playlist[0])
+            self.download_missing_songs_in_playlist(missing_songs, playlist_name)
 
         # Delete any local songs not present on Youtube
         if len(remove_songs) > 0:
-            logging.info(f"Deleting songs not in remote playlist {playlist[0]}")
+            logging.info(f"Deleting songs not in remote playlist {playlist_name}")
 
             for remove_song in remove_songs:
-                if self.delete_song(f"./playlists/{playlist[0]}/{remove_song[0]}"):
-                    logging.info(f"Removed {remove_song[0]} from {playlist[0]}")
+                if self.delete_song(f"./playlists/{playlist_name}/{remove_song[0]}"):
+                    logging.info(f"Removed {remove_song[0]} from {playlist_name}")
 
-    def download_new_playlist(self, playlist):
-        logging.info(f"{playlist[0]} playlist doesn't exist, downloading now")
+    def download_new_playlist(self, playlist_name, playlist_link):
+        logging.info(f"{playlist_name} playlist doesn't exist, downloading now")
 
-        os.mkdir(f"./playlists/{playlist[0]}")
+        os.mkdir(f"./playlists/{playlist_name}")
 
         # Download all playlist songs from YouTube
         download_options = dict(YDL_OPTIONS_PLAYLIST)
-        song_path_format = f"./playlists/{playlist[0]}/%(title)s [%(id)s].%(ext)s"
+        song_path_format = f"./playlists/{playlist_name}/%(title)s [%(id)s].%(ext)s"
         download_options["outtmpl"] = song_path_format
 
-        query = f"https://www.youtube.com/playlist?list={playlist[1]}"
+        query = f"https://www.youtube.com/playlist?list={playlist_link}"
         songs = self.query_youtube(query, download_options, True, True)
 
         if songs is None:
-            logging.error(f"Issue downloading new playlist {playlist[0]} from scratch")
+            logging.error(
+                f"Issue downloading new playlist {playlist_name} from scratch"
+            )
 
-    def download_missing_songs_in_playlist(self, missing_songs, playlist):
-        logging.info(f"Downloading missing songs from {playlist} playlist")
+    def download_missing_songs_in_playlist(self, missing_songs, playlist_name):
+        logging.info(f"Downloading missing songs from {playlist_name} playlist")
 
         song_path_format = (
-            f"{os.getcwd()}/playlists/{playlist}/%(title)s [%(id)s].%(ext)s"
+            f"{os.getcwd()}/playlists/{playlist_name}/%(title)s [%(id)s].%(ext)s"
         )
         download_options = dict(YDL_OPTIONS)
         download_options["outtmpl"] = song_path_format
 
         for song in missing_songs:
             # Download missing song from youtube
-            logging.info(f"Downloading song {song[0]} for playlist:{playlist}")
+            logging.info(f"Downloading song {song[0]} for playlist:{playlist_name}")
             query = f"https://www.youtube.com/watch?v={song[1]}"
             songs = self.query_youtube(query, download_options, True, True)
             if songs is None:
                 logging.error(
-                    f"Issue downloading song id: {song[0]} for playlist {playlist}"
+                    f"Issue downloading song id: {song[0]} for playlist {playlist_name}"
                 )
 
     def delete_song(self, song_path):
@@ -211,9 +214,7 @@ class MusicCog(commands.Cog):
 
         # If bot failed to connect to caller's voice channel
         if self.connected_vc is None:
-            await interaction.channel.send(
-                "Could not connect to the voice channel"
-            )
+            await interaction.channel.send("Could not connect to the voice channel")
             logging.error("Dot couldn't connect to a voice channel")
             return
 
@@ -277,7 +278,6 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(description="Plays requested song from YouTube")
     async def play(self, interaction, song_query: str):
-
         # Get caller's voice channel
         caller_vc = interaction.user.voice.channel if interaction.user.voice else None
         if caller_vc is None:
@@ -290,7 +290,9 @@ class MusicCog(commands.Cog):
             return
 
         if song_query != " ":
-            await interaction.response.send_message("Searching for song, this might take a while!")
+            await interaction.response.send_message(
+                "Searching for song, this might take a while!"
+            )
 
             # Find song on YouTube in a thread
             coroutine = asyncio.to_thread(
@@ -310,10 +312,14 @@ class MusicCog(commands.Cog):
                 }
 
             if song is None:
-                await interaction.followup.send("Could not find the song. Please try again")
+                await interaction.followup.send(
+                    "Could not find the song. Please try again"
+                )
                 return
 
-            await interaction.followup.send(f"Song, {song['title']}, added to the queue")
+            await interaction.followup.send(
+                f"Song, {song['title']}, added to the queue"
+            )
             self.music_queue.append([song, caller_vc])
 
         if len(self.music_queue) == 0:
@@ -341,7 +347,7 @@ class MusicCog(commands.Cog):
             await interaction.response.send_message("No music is paused!")
 
     @app_commands.command(description="Skips specified number of songs songs")
-    async def skip(self, interaction, num_to_skip: int):
+    async def skip(self, interaction, num_to_skip: int = 1):
         response = interaction.response
 
         if not self.is_playing:
@@ -410,7 +416,7 @@ class MusicCog(commands.Cog):
     )
     async def clear(self, interaction):
         self.music_queue = []
-        self.kill_process() # Skip any songs if playing
+        self.kill_process()  # Skip any songs if playing
         self.current_song = None
 
         # Delete all left over mp3 songs
