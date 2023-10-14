@@ -1,5 +1,7 @@
+from datetime import datetime
 from discord import app_commands
 from discord.ext import commands
+from zoneinfo import ZoneInfo
 import random as rand
 
 
@@ -28,6 +30,16 @@ class OtherCog(commands.Cog):
     async def echo(self, interaction, msg: str):
         await interaction.response.send_message("Message recieved", ephemeral=True)
         await interaction.channel.send(msg)
+
+    @app_commands.command(description="Gives current time in London and Brisbane")
+    async def time(self, interaction):
+        uk_time = datetime.now(ZoneInfo("Europe/London"))
+        aus_time = datetime.now(ZoneInfo("Australia/Brisbane"))
+        await interaction.response.send_message(
+            f"LON time is {uk_time.strftime('%H:%M%p on %d %b')}\n"
+            f"BRIS time is {aus_time.strftime('%H:%M%p on %d %b')}",
+            ephemeral=True,
+        )
 
     @commands.command()
     async def sync_slash_commands(self, ctx):
