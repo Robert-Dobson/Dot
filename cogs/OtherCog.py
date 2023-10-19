@@ -37,7 +37,7 @@ class OtherCog(commands.Cog):
         aus_time = datetime.now(ZoneInfo("Australia/Brisbane"))
         await interaction.response.send_message(
             f"LON time is {uk_time.strftime('%H:%M%p on %d %b')}\n"
-            f"BRIS time is {aus_time.strftime('%H:%M%p on %d %b')}",
+            f"BNE time is {aus_time.strftime('%H:%M%p on %d %b')}",
             ephemeral=True,
         )
 
