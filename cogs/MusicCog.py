@@ -35,7 +35,7 @@ YDL_OPTIONS_PLAYLIST = {
         }
     ],
     "logger": logging,
-    "no-abort-on-error": True,
+    "ignoreerrors": "only_download",
 }
 
 
@@ -101,6 +101,9 @@ class MusicCog(commands.Cog):
         self.is_syncing = False
 
     def sync_existing_playlist(self, playlist_name, playlist_link):
+        # Compare local songs to remote songs
+        logging.info(f"Syncing {playlist_name}")
+
         # Get metadata of playlist songs from YT
         query = f"https://www.youtube.com/playlist?list={playlist_link}"
         metadata = self.query_youtube(query, YDL_OPTIONS_PLAYLIST, False, True)
@@ -108,10 +111,11 @@ class MusicCog(commands.Cog):
             logging.error("Issue fetching playlist data for sync")
             return
 
-        # Compare local songs to remote songs
-        logging.info("Comparing remote playlists to local playlists for sync")
-
-        remote_songs = [[song_info["title"], song_info["id"]] for song_info in metadata]
+        remote_songs = [
+            [song_info["title"], song_info["id"]]
+            for song_info in metadata
+            if song_info is not None
+        ]
         local_songs = [
             [song, re.findall(".*\[(.*)\].mp3", song)[0]]
             for song in os.listdir(f"./playlists/{playlist_name}")
@@ -499,7 +503,7 @@ class MusicCog(commands.Cog):
             coroutine = asyncio.to_thread(self.playlist_sync)
             await coroutine
 
-            await interaction.followup.send("Playlist sync complete")
+            await interaction.channel.send("Playlist sync complete")
         else:
             await response.send_message("Already syncing!")
             logging.warning("Tried syncing when already syncing")
