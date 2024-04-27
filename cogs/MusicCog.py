@@ -62,18 +62,22 @@ class MusicCog(commands.Cog):
         # Speed up playlist extraction when its not being downloaded
         if is_playlist and not should_download:
             options = dict(options)
-            options["flat-playlist"] = True
+            options["extract_flat"] = True
 
         # Use YoutubeDL to download the song from YouTube
         with YoutubeDL(options) as ydl:
             logging.info(f"Searching YouTube for {query}")
 
             try:
-                info = ydl.extract_info(query, download=should_download)["entries"]
+                result = ydl.extract_info(query, download=should_download)
+                info = ydl.sanitize_info(result)
 
-                if not is_playlist:
-                    # Only want one song information
-                    info = info[0]
+                if "entries" in info:
+                    info = info["entries"]
+
+                    if not is_playlist:
+                        # Only want one song information
+                        info = info[0]
 
                 return info
             except:
