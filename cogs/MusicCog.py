@@ -241,7 +241,7 @@ class MusicCog(commands.Cog):
         music = self.music_queue.pop(0)
         path = music[0]["path"]
         remove = music[0]["delete"]
-
+        
         if not os.path.isfile(path):
             logging.error(f"Tried to play a song that doesn't exist: {path}")
             return
@@ -304,9 +304,15 @@ class MusicCog(commands.Cog):
                 "Searching for song, this might take a while!"
             )
 
+            song_path_format = (
+                f"{os.getcwd()}/[%(id)s].%(ext)s"
+            )
+            download_options = dict(YDL_OPTIONS)
+            download_options["outtmpl"] = song_path_format
+
             # Find song on YouTube in a thread
             coroutine = asyncio.to_thread(
-                self.query_youtube, f"ytsearch:{song_query}", YDL_OPTIONS, True, False
+                self.query_youtube, f"ytsearch:{song_query}", download_options, True, False
             )
             info = await coroutine
 
@@ -317,7 +323,7 @@ class MusicCog(commands.Cog):
                 # Return song information and path
                 song = {
                     "title": info["title"],
-                    "path": f"{info['title']} [{info['id']}].mp3",
+                    "path": f"[{info['id']}].mp3",
                     "delete": True,
                 }
 
