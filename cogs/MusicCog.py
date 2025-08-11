@@ -24,6 +24,7 @@ YDL_OPTIONS = {
         }
     ],
     "logger": logging,
+    "cookiefile" : "cookies.txt",
 }
 YDL_OPTIONS_PLAYLIST = {
     "format": "bestaudio/best",
@@ -36,6 +37,7 @@ YDL_OPTIONS_PLAYLIST = {
     ],
     "logger": logging,
     "ignoreerrors": "only_download",
+    "cookiefile" : "cookies.txt",
 }
 
 
