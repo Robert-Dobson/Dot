@@ -115,13 +115,44 @@ class MusicCog(commands.Cog):
 
         target_vc = self.music_queue[0]["voice_channel"]
 
+        # Check if voice dependencies are available
+        try:
+            import nacl
+        except ImportError:
+            await interaction.channel.send("❌ Voice dependencies missing. Please install: `pip install discord.py[voice] PyNaCl`")
+            logging.error("PyNaCl not installed - voice connections will fail")
+            return
+
         # If not connected to any voice channel
         if self.connected_vc is None or not self.connected_vc.is_connected():
-            self.connected_vc = await target_vc.connect()
+            try:
+                await interaction.channel.send("🔄 Connecting to voice channel...")
+                self.connected_vc = await target_vc.connect(timeout=60.0)
+                # Give Discord more time to establish the connection properly
+                await asyncio.sleep(2)
+                logging.info(f"Successfully connected to voice channel: {target_vc.name}")
+            except discord.errors.ConnectionClosed as e:
+                logging.error(f"Voice connection closed during handshake: {e}")
+                await interaction.channel.send("❌ Voice connection failed. This might be due to:\n• Missing voice dependencies\n• Server network restrictions\n• Discord voice server issues")
+                return
+            except asyncio.TimeoutError:
+                logging.error("Voice connection timed out")
+                await interaction.channel.send("❌ Voice connection timed out. Please try again.")
+                return
+            except Exception as e:
+                logging.error(f"Failed to connect to voice channel: {e}")
+                await interaction.channel.send(f"❌ Could not connect to voice channel: {str(e)}")
+                return
 
         # If in wrong voice channel
-        if self.connected_vc != target_vc:
-            await self.connected_vc.move_to(target_vc)
+        if self.connected_vc.channel != target_vc:
+            try:
+                await self.connected_vc.move_to(target_vc)
+                await asyncio.sleep(1)  # Give time for move to complete
+            except Exception as e:
+                logging.error(f"Failed to move to voice channel: {e}")
+                await interaction.channel.send("Could not move to the voice channel.")
+                return
 
         # If bot failed to connect to caller's voice channel
         if self.connected_vc is None:
@@ -184,6 +215,16 @@ class MusicCog(commands.Cog):
 
         self.is_playing = False
         self.is_paused = False
+
+        # Properly disconnect from voice channel
+        if self.connected_vc and self.connected_vc.is_connected():
+            try:
+                await self.connected_vc.disconnect()
+                logging.info("Disconnected from voice channel")
+            except Exception as e:
+                logging.error(f"Error disconnecting from voice: {e}")
+            finally:
+                self.connected_vc = None
 
         await self.connected_vc.disconnect()
 
