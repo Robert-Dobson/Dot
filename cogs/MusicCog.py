@@ -9,7 +9,6 @@ import random
 from yt_dlp import YoutubeDL
 
 YDL_OPTIONS = {
-    "format": "bestaudio/best",
     "noplaylist": "True",
     "postprocessors": [
         {
@@ -20,6 +19,7 @@ YDL_OPTIONS = {
     ],
     "logger": logging,
     "cookiefile": "cookies.txt",
+    "remote_components": ["ejs:github"],
 }
 
 
@@ -77,7 +77,7 @@ class MusicCog(commands.Cog):
         with YoutubeDL(options) as ydl:
             logging.info(f"Searching YouTube for {query}")
             try:
-                result = ydl.extract_info(query, download=True)
+                result = ydl.extract_info(f"ytsearch:{query}", download=True)
                 info = ydl.sanitize_info(result)
                 
                 if "entries" in info and info["entries"]:
