@@ -3,10 +3,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import logging
-import os
 import psutil
 import random
 from yt_dlp import YoutubeDL
+import nacl
 
 YDL_OPTIONS = {
     "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
@@ -85,37 +85,24 @@ class MusicCog(commands.Cog):
 
         target_vc = self.music_queue[0]["voice_channel"]
 
-        # Check if voice dependencies are available
-        try:
-            import nacl
-        except ImportError:
-            await interaction.channel.send(
-                "❌ Voice dependencies missing. Please install: `pip install discord.py[voice] PyNaCl`"
-            )
-            logging.error("PyNaCl not installed - voice connections will fail")
-            return
-
         # If not connected to any voice channel
         if self.connected_vc is None or not self.connected_vc.is_connected():
             try:
-                await interaction.channel.send("🔄 Connecting to voice channel...")
                 self.connected_vc = await target_vc.connect(timeout=60.0)
                 # Give Discord more time to establish the connection properly
                 await asyncio.sleep(2)
                 logging.info(f"Successfully connected to voice channel: {target_vc.name}")
             except discord.errors.ConnectionClosed as e:
                 logging.error(f"Voice connection closed during handshake: {e}")
-                await interaction.channel.send(
-                    "❌ Voice connection failed. This might be due to:\n• Missing voice dependencies\n• Server network restrictions\n• Discord voice server issues"
-                )
+                await interaction.channel.send(f"Voice connection failed: {e}")
                 return
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as e:
                 logging.error("Voice connection timed out")
-                await interaction.channel.send("❌ Voice connection timed out. Please try again.")
+                await interaction.channel.send(f"Voice connection timed out: {e}")
                 return
             except Exception as e:
                 logging.error(f"Failed to connect to voice channel: {e}")
-                await interaction.channel.send(f"❌ Could not connect to voice channel: {str(e)}")
+                await interaction.channel.send(f"Could not connect to voice channel: {e}")
                 return
 
         # If in wrong voice channel
@@ -125,7 +112,7 @@ class MusicCog(commands.Cog):
                 await asyncio.sleep(1)  # Give time for move to complete
             except Exception as e:
                 logging.error(f"Failed to move to voice channel: {e}")
-                await interaction.channel.send("Could not move to the voice channel.")
+                await interaction.channel.send(f"Could not move to the voice channel: {e}")
                 return
 
         # If bot failed to connect to caller's voice channel
@@ -142,7 +129,13 @@ class MusicCog(commands.Cog):
             self.is_playing = False
             # Clear voice channel status when queue is empty
             if self.connected_vc and self.connected_vc.channel:
-                asyncio.create_task(self.connected_vc.channel.edit(status=None))
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        self.connected_vc.channel.edit(status=""),
+                        self.bot.loop
+                    )
+                except Exception as e:
+                    logging.error(f"Failed to clear voice channel status: {e}")
             return
 
         # Get next song from queue
@@ -157,7 +150,13 @@ class MusicCog(commands.Cog):
             # Update voice channel status with current song
             if self.connected_vc and self.connected_vc.channel:
                 status_text = f"🎵 {self.current_song[:80]}"  # Limit to 80 chars
-                asyncio.create_task(self.connected_vc.channel.edit(status=status_text))
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        self.connected_vc.channel.edit(status=status_text),
+                        self.bot.loop
+                    )
+                except Exception as e:
+                    logging.error(f"Failed to update voice channel status: {e}")
 
             ffmpeg_options = {
                 "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
@@ -192,7 +191,7 @@ class MusicCog(commands.Cog):
             try:
                 # Clear status before disconnecting
                 if self.connected_vc.channel:
-                    await self.connected_vc.channel.edit(status=None)
+                    await self.connected_vc.channel.edit(status="")
                 await self.connected_vc.disconnect()
                 logging.info("Disconnected from voice channel")
             except Exception as e:
