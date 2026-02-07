@@ -41,6 +41,44 @@ class OtherCog(commands.Cog):
             ephemeral=True,
         )
 
+    @app_commands.command(description="Check bot's voice setup and dependencies")
+    async def voice_check(self, interaction):
+        """Diagnostic command to check voice setup"""
+        import subprocess
+        import sys
+        
+        embed = discord.Embed(title="🔍 Voice Setup Diagnostics", color=0x00ff00)
+        
+        # Check PyNaCl
+        try:
+            import nacl
+            embed.add_field(name="✅ PyNaCl", value=f"Installed: {nacl.__version__}", inline=False)
+        except ImportError:
+            embed.add_field(name="❌ PyNaCl", value="Not installed! Run: `pip install PyNaCl`", inline=False)
+        
+        # Check FFmpeg
+        try:
+            result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                version = result.stdout.split('\n')[0]
+                embed.add_field(name="✅ FFmpeg", value=f"Available: {version[:50]}...", inline=False)
+            else:
+                embed.add_field(name="❌ FFmpeg", value="Found but not working properly", inline=False)
+        except FileNotFoundError:
+            embed.add_field(name="❌ FFmpeg", value="Not found! Install: `sudo apt install ffmpeg`", inline=False)
+        except subprocess.TimeoutExpired:
+            embed.add_field(name="⚠️ FFmpeg", value="Found but slow to respond", inline=False)
+        except Exception as e:
+            embed.add_field(name="❌ FFmpeg", value=f"Error checking: {str(e)}", inline=False)
+        
+        # Check Discord.py version
+        embed.add_field(name="📦 Discord.py", value=f"Version: {discord.__version__}", inline=False)
+        
+        # Check Python version
+        embed.add_field(name="🐍 Python", value=f"Version: {sys.version.split()[0]}", inline=False)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
     @commands.command()
     async def sync_slash_commands(self, ctx):
         ctx.bot.tree.copy_global_to(guild=ctx.guild)
