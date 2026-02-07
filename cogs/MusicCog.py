@@ -9,14 +9,8 @@ import random
 from yt_dlp import YoutubeDL
 
 YDL_OPTIONS = {
+    "format": "bestaudio/best",
     "noplaylist": "True",
-    "postprocessors": [
-        {
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }
-    ],
     "logger": logging,
     "cookiefile": "cookies.txt",
     "remote_components": ["ejs:github"],
@@ -43,41 +37,20 @@ class MusicCog(commands.Cog):
         if self.connected_vc and self.is_playing:
             self.kill_process()
         
-        # Clear the queue and clean up files
-        for song in self.music_queue:
-            if song["delete"]:
-                self.delete_song(song["path"])
-        
+        # Clear the queue 
         self.music_queue.clear()
-        
-        # Clean up any remaining temporary files
-        self._cleanup_temp_files()
         
         # Reset state
         self.is_playing = False
         self.is_paused = False
         self.current_song = None
 
-    def _cleanup_temp_files(self):
-        """Clean up all temporary MP3 files"""
-        try:
-            for filename in os.listdir("."):
-                if filename.endswith(".mp3") and filename.startswith("["):
-                    if self.delete_song(filename):
-                        logging.info(f"Cleaned up temporary file: {filename}")
-        except Exception as e:
-            logging.exception(f"Error during temp file cleanup: {e}")
-
     def download_song(self, query):
-        """Simple method to download a single song"""
-        song_path_format = f"{os.getcwd()}/[%(id)s].%(ext)s"
-        options = dict(YDL_OPTIONS)
-        options["outtmpl"] = song_path_format
-        
-        with YoutubeDL(options) as ydl:
+        """Extract song stream URL instead of downloading"""
+        with YoutubeDL(YDL_OPTIONS) as ydl:
             logging.info(f"Searching YouTube for {query}")
             try:
-                result = ydl.extract_info(f"ytsearch:{query}", download=True)
+                result = ydl.extract_info(f"ytsearch:{query}", download=False)
                 info = ydl.sanitize_info(result)
                 
                 if "entries" in info and info["entries"]:
@@ -85,28 +58,17 @@ class MusicCog(commands.Cog):
                     
                 return {
                     "title": info["title"],
-                    "path": f"[{info['id']}].mp3",
+                    "url": info["url"],
                     "id": info["id"],
-                    "delete": True,
                 }
             except Exception as e:
-                logging.exception(f"Issue downloading {query}: {e}")
+                logging.exception(f"Issue extracting stream URL for {query}: {e}")
                 return None
 
     def kill_process(self, proc_name="ffmpeg"):
         for proc in psutil.process_iter():
             if proc.name() == proc_name:
                 proc.kill()
-
-    def delete_song(self, path):
-        """Delete a song file safely"""
-        try:
-            if os.path.exists(path):
-                os.remove(path)
-                return True
-        except Exception as e:
-            logging.exception(f"Failed to delete {path}: {e}")
-        return False
 
     async def start_music(self, interaction):
         if len(self.music_queue) == 0:
@@ -171,37 +133,25 @@ class MusicCog(commands.Cog):
         # Get next song from queue
         self.is_playing = True
         queue_item = self.music_queue.pop(0)
-        path = queue_item["path"]
-        remove = queue_item["delete"]
-        
-        if not os.path.isfile(path):
-            logging.error(f"Tried to play a song that doesn't exist: {path}")
-            # Try next song instead of stopping
-            self.play_next()
-            return
 
         # Play next song
         try:
-            logging.info(f"Playing {queue_item['title']}")
             self.current_song = queue_item["title"]
+            logging.info(f"Playing {self.current_song} in {queue_item['voice_channel'].name}")
+            ffmpeg_options = {
+                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                'options': '-vn'
+            }
             self.connected_vc.play(
-                discord.FFmpegPCMAudio(path, executable="ffmpeg", options="-vn"),
-                after=lambda e: self.end_song(path, remove),
+                discord.FFmpegPCMAudio(queue_item["url"], executable="ffmpeg", **ffmpeg_options),
+                after=lambda _: self.end_song(),
             )
         except Exception as e:
-            logging.exception(f"Failed to play {queue_item['title']}: {e}")
-            # Clean up file if it exists and try next song
-            if remove:
-                self.delete_song(path)
+            logging.exception(f"Failed to play {self.current_song}: {e}")
             self.play_next()
 
-    def end_song(self, path, remove):
+    def end_song(self):
         self.current_song = None
-
-        if remove:
-            if self.delete_song(path):
-                logging.info(f"Removed temporary song: {path}")
-
         self.play_next()
 
     async def leave_channel(self):
@@ -225,17 +175,6 @@ class MusicCog(commands.Cog):
                 logging.error(f"Error disconnecting from voice: {e}")
             finally:
                 self.connected_vc = None
-
-        await self.connected_vc.disconnect()
-
-        # Wait for music and bot to fully stop
-        await asyncio.sleep(5)
-
-        # Delete all left over mp3 songs
-        for filename in os.listdir("."):
-            if filename.endswith(".mp3"):
-                if self.delete_song(filename):
-                    logging.info(f"Removed {filename} as part of bot leaving")
 
     @app_commands.command(description="Plays requested song from YouTube")
     async def play(self, interaction, song_query: str):
@@ -269,8 +208,7 @@ class MusicCog(commands.Cog):
         )
         self.music_queue.append({
             "title": song["title"],
-            "path": song["path"],
-            "delete": song["delete"],
+            "url": song["url"],
             "voice_channel": caller_vc
         })
 
@@ -313,21 +251,11 @@ class MusicCog(commands.Cog):
             await response.send_message("Must skip 1 or more songs")
             return
 
-        if num_to_skip > 1:
-            if len(self.music_queue) < num_to_skip:
-                await response.send_message("There's not enough songs in the queue")
-                return
+        if len(self.music_queue) < num_to_skip:
+            await response.send_message("There's not enough songs in the queue")
+            return
 
-            # Remove n-1 songs from queue
-            for i in range(num_to_skip - 1):
-                # Remember to delete any temporary songs
-                if self.music_queue[i]["delete"]:
-                    path = self.music_queue[i]["path"]
-                    if self.delete_song(path):
-                        logging.info(f"Removed {path} through skipping functionality")
-
-                # Remove song from queue
-                self.music_queue.pop(0)
+        del self.music_queue[:num_to_skip]
 
         # Skip currently playing song
         if self.connected_vc is not None and self.is_playing is True:
@@ -373,12 +301,6 @@ class MusicCog(commands.Cog):
         self.music_queue = []
         self.kill_process()  # Skip any songs if playing
         self.current_song = None
-
-        # Delete all left over mp3 songs
-        for filename in os.listdir("."):
-            if filename.endswith(".mp3"):
-                if self.delete_song(filename):
-                    logging.info(f"Removed {filename} as part of clearing queue")
 
         await interaction.response.send_message("Music queue is cleared!")
 
