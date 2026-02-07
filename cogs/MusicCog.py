@@ -223,10 +223,19 @@ class MusicCog(commands.Cog):
             return
 
         response_text = ""
-        for song in songs:
-            response_text += f"Song, {song['title']}, added to the queue\n"
-            self.music_queue.append({"title": song["title"], "url": song["url"], "voice_channel": caller_vc})
+        if len(songs) == 1:
+            response_text += f"Song, {songs[0]['title']}, added to the queue"
+        else:
+            num_of_songs_in_output = 0
+            response_text += f"Found {len(songs)} results for '{song_query}'\n"
+            for song in songs:
+                self.music_queue.append({"title": song["title"], "url": song["url"], "voice_channel": caller_vc})
 
+                # Limit number of songs shown in output to avoid spamming
+                if num_of_songs_in_output >= 5:
+                    response_text += f"... and {len(songs) - num_of_songs_in_output} more results\n"
+                    break
+                response_text += f"Song, {song['title']}, added to the queue\n"
         await interaction.followup.send(response_text)
 
         if not self.is_playing:
