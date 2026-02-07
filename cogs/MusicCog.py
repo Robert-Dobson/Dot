@@ -74,6 +74,7 @@ class MusicCog(commands.Cog):
                             "id": entry["id"],
                         }
                     )
+                return results
             except Exception as e:
                 logging.exception(f"Issue extracting stream URL for {query}: {e}")
                 return None
