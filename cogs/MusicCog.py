@@ -32,14 +32,14 @@ class MusicCog(commands.Cog):
     def cog_unload(self):
         """Clean up resources when cog is unloaded"""
         logging.info("Unloading MusicCog - cleaning up resources")
-        
+
         # Stop any playing music
         if self.connected_vc and self.is_playing:
             self.kill_process()
-        
-        # Clear the queue 
+
+        # Clear the queue
         self.music_queue.clear()
-        
+
         # Reset state
         self.is_playing = False
         self.is_paused = False
@@ -52,10 +52,10 @@ class MusicCog(commands.Cog):
             try:
                 result = ydl.extract_info(f"ytsearch:{query}", download=False)
                 info = ydl.sanitize_info(result)
-                
+
                 if "entries" in info and info["entries"]:
                     info = info["entries"][0]
-                    
+
                 return {
                     "title": info["title"],
                     "url": info["url"],
@@ -81,7 +81,9 @@ class MusicCog(commands.Cog):
         try:
             import nacl
         except ImportError:
-            await interaction.channel.send("❌ Voice dependencies missing. Please install: `pip install discord.py[voice] PyNaCl`")
+            await interaction.channel.send(
+                "❌ Voice dependencies missing. Please install: `pip install discord.py[voice] PyNaCl`"
+            )
             logging.error("PyNaCl not installed - voice connections will fail")
             return
 
@@ -95,7 +97,9 @@ class MusicCog(commands.Cog):
                 logging.info(f"Successfully connected to voice channel: {target_vc.name}")
             except discord.errors.ConnectionClosed as e:
                 logging.error(f"Voice connection closed during handshake: {e}")
-                await interaction.channel.send("❌ Voice connection failed. This might be due to:\n• Missing voice dependencies\n• Server network restrictions\n• Discord voice server issues")
+                await interaction.channel.send(
+                    "❌ Voice connection failed. This might be due to:\n• Missing voice dependencies\n• Server network restrictions\n• Discord voice server issues"
+                )
                 return
             except asyncio.TimeoutError:
                 logging.error("Voice connection timed out")
@@ -139,8 +143,8 @@ class MusicCog(commands.Cog):
             self.current_song = queue_item["title"]
             logging.info(f"Playing {self.current_song} in {queue_item['voice_channel'].name}")
             ffmpeg_options = {
-                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-                'options': '-vn'
+                "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+                "options": "-vn",
             }
             self.connected_vc.play(
                 discord.FFmpegPCMAudio(queue_item["url"], executable="ffmpeg", **ffmpeg_options),
@@ -189,28 +193,18 @@ class MusicCog(commands.Cog):
             await self.resume(interaction)
             return
 
-        await interaction.response.send_message(
-            "Searching for song, this might take a while!"
-        )
+        await interaction.response.send_message("Searching for song, this might take a while!")
 
         # Find song on YouTube in a thread
         coroutine = asyncio.to_thread(self.download_song, song_query)
         song = await coroutine
 
         if song is None:
-            await interaction.followup.send(
-                "Could not find the song. Please try again"
-            )
+            await interaction.followup.send("Could not find the song. Please try again")
             return
 
-        await interaction.followup.send(
-            f"Song, {song['title']}, added to the queue"
-        )
-        self.music_queue.append({
-            "title": song["title"],
-            "url": song["url"],
-            "voice_channel": caller_vc
-        })
+        await interaction.followup.send(f"Song, {song['title']}, added to the queue")
+        self.music_queue.append({"title": song["title"], "url": song["url"], "voice_channel": caller_vc})
 
         if not self.is_playing:
             await self.start_music(interaction)
@@ -255,7 +249,13 @@ class MusicCog(commands.Cog):
             await response.send_message("There's not enough songs in the queue")
             return
 
-        del self.music_queue[:num_to_skip]
+        # If skipping more than 1 song, remove n-1 songs from queue first
+        if num_to_skip > 1:
+            if len(self.music_queue) < num_to_skip:
+                await response.send_message("There's not enough songs in the queue")
+                return
+
+            del self.music_queue[: num_to_skip - 1]
 
         # Skip currently playing song
         if self.connected_vc is not None and self.is_playing is True:
@@ -267,9 +267,7 @@ class MusicCog(commands.Cog):
 
         await response.send_message(f"Skipped {num_to_skip} songs")
 
-    @app_commands.command(
-        description="Displays next 20 songs in queue (and current song)"
-    )
+    @app_commands.command(description="Displays next 20 songs in queue (and current song)")
     async def queue(self, interaction):
         queue_text = ""
 
@@ -283,7 +281,7 @@ class MusicCog(commands.Cog):
             queue_text += f"📝 **Queue ({len(self.music_queue)} song(s)):**\n"
             for i, song in enumerate(self.music_queue[:20], 1):
                 queue_text += f"`{i:2d}.` {song['title']}\n"
-            
+
             if len(self.music_queue) > 20:
                 queue_text += f"... and {len(self.music_queue) - 20} more songs"
         else:
@@ -294,9 +292,7 @@ class MusicCog(commands.Cog):
 
         await interaction.response.send_message(queue_text)
 
-    @app_commands.command(
-        description="Removes all songs from the queue (current song is unaffected)"
-    )
+    @app_commands.command(description="Removes all songs from the queue (current song is unaffected)")
     async def clear(self, interaction):
         self.music_queue = []
         self.kill_process()  # Skip any songs if playing
@@ -347,6 +343,7 @@ class MusicCog(commands.Cog):
                     logging.info("Left voice channel automatically")
                     await self.leave_channel()
                     return
+
 
 async def setup(bot):
     await bot.add_cog(MusicCog(bot))
