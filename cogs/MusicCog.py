@@ -140,6 +140,9 @@ class MusicCog(commands.Cog):
     def play_next(self):
         if len(self.music_queue) == 0:
             self.is_playing = False
+            # Clear voice channel status when queue is empty
+            if self.connected_vc and self.connected_vc.channel:
+                asyncio.create_task(self.connected_vc.channel.edit(status=None))
             return
 
         # Get next song from queue
@@ -150,6 +153,12 @@ class MusicCog(commands.Cog):
         try:
             self.current_song = queue_item["title"]
             logging.info(f"Playing {self.current_song} in {queue_item['voice_channel'].name}")
+
+            # Update voice channel status with current song
+            if self.connected_vc and self.connected_vc.channel:
+                status_text = f"🎵 {self.current_song[:80]}"  # Limit to 80 chars
+                asyncio.create_task(self.connected_vc.channel.edit(status=status_text))
+
             ffmpeg_options = {
                 "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
                 "options": "-vn -b:a 128k -bufsize 512k -af dynaudnorm=f=200:g=15",
@@ -178,9 +187,12 @@ class MusicCog(commands.Cog):
         self.is_playing = False
         self.is_paused = False
 
-        # Properly disconnect from voice channel
+        # Clear voice channel status and disconnect
         if self.connected_vc and self.connected_vc.is_connected():
             try:
+                # Clear status before disconnecting
+                if self.connected_vc.channel:
+                    await self.connected_vc.channel.edit(status=None)
                 await self.connected_vc.disconnect()
                 logging.info("Disconnected from voice channel")
             except Exception as e:
