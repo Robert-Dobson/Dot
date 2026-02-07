@@ -10,9 +10,9 @@ import nacl
 
 YDL_OPTIONS = {
     "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-    "noplaylist": "True",
+    "noplaylist": False,
     "prefer_free_formats": False,
-    "extract_flat": False,
+    "extract_flat": True,
     "logger": logging,
     "cookiefile": "cookies.txt",
     "remote_components": ["ejs:github"],
@@ -61,14 +61,19 @@ class MusicCog(commands.Cog):
 
                 info = ydl.sanitize_info(result)
 
-                if "entries" in info and info["entries"]:
-                    info = info["entries"][0]
+                if "entries" not in info or not info["entries"]:
+                    logging.warning(f"No entries found for query: {query}")
+                    return None
 
-                return {
-                    "title": info["title"],
-                    "url": info["url"],
-                    "id": info["id"],
-                }
+                results = []
+                for entry in info["entries"]:
+                    results.append(
+                        {
+                            "title": entry["title"],
+                            "url": entry["url"],
+                            "id": entry["id"],
+                        }
+                    )
             except Exception as e:
                 logging.exception(f"Issue extracting stream URL for {query}: {e}")
                 return None
@@ -210,14 +215,18 @@ class MusicCog(commands.Cog):
 
         # Find song on YouTube in a thread
         coroutine = asyncio.to_thread(self.download_song, song_query)
-        song = await coroutine
+        songs = await coroutine
 
-        if song is None:
+        if songs is None or len(songs) == 0:
             await interaction.followup.send("Could not find the song. Please try again")
             return
 
-        await interaction.followup.send(f"Song, {song['title']}, added to the queue")
-        self.music_queue.append({"title": song["title"], "url": song["url"], "voice_channel": caller_vc})
+        response_text = ""
+        for song in songs:
+            response_text += f"Song, {song['title']}, added to the queue\n"
+            self.music_queue.append({"title": song["title"], "url": song["url"], "voice_channel": caller_vc})
+
+        await interaction.followup.send(response_text)
 
         if not self.is_playing:
             await self.start_music(interaction)
