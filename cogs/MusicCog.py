@@ -225,7 +225,6 @@ class MusicCog(commands.Cog):
         response_text = ""
         if len(songs) == 1:
             response_text += f"Song, {songs[0]['title']}, added to the queue"
-            self.music_queue.append({"title": songs[0]["title"], "url": songs[0]["url"], "voice_channel": caller_vc})
         else:
             num_of_songs_in_output = 0
             response_text += f"Found {len(songs)} results for '{song_query}'\n"
@@ -237,7 +236,6 @@ class MusicCog(commands.Cog):
                     response_text += f"... and {len(songs) - num_of_songs_in_output} more results\n"
                     break
                 response_text += f"Song, {song['title']}, added to the queue\n"
-                num_of_songs_in_output += 1
         await interaction.followup.send(response_text)
 
         if not self.is_playing:
