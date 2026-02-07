@@ -152,7 +152,7 @@ class MusicCog(commands.Cog):
             logging.info(f"Playing {self.current_song} in {queue_item['voice_channel'].name}")
             ffmpeg_options = {
                 "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
-                "options": "-vn -b:a 128k -bufsize 512k",
+                "options": "-vn -b:a 128k -bufsize 512k -af dynaudnorm=f=200:g=15",
             }
             self.connected_vc.play(
                 discord.FFmpegPCMAudio(queue_item["url"], executable="ffmpeg", **ffmpeg_options),
