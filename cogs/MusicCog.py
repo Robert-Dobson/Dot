@@ -130,10 +130,7 @@ class MusicCog(commands.Cog):
             # Clear voice channel status when queue is empty
             if self.connected_vc and self.connected_vc.channel:
                 try:
-                    asyncio.run_coroutine_threadsafe(
-                        self.connected_vc.channel.edit(status=""),
-                        self.bot.loop
-                    )
+                    asyncio.run_coroutine_threadsafe(self.connected_vc.channel.edit(status=""), self.bot.loop)
                 except Exception as e:
                     logging.error(f"Failed to clear voice channel status: {e}")
             return
@@ -149,12 +146,9 @@ class MusicCog(commands.Cog):
 
             # Update voice channel status with current song
             if self.connected_vc and self.connected_vc.channel:
-                status_text = f"🎵 {self.current_song[:80]}"  # Limit to 80 chars
+                status_text = f"🎵  {self.current_song}"[:80]  # Limit to 80 chars
                 try:
-                    asyncio.run_coroutine_threadsafe(
-                        self.connected_vc.channel.edit(status=status_text),
-                        self.bot.loop
-                    )
+                    asyncio.run_coroutine_threadsafe(self.connected_vc.channel.edit(status=status_text), self.bot.loop)
                 except Exception as e:
                     logging.error(f"Failed to update voice channel status: {e}")
 
