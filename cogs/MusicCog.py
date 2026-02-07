@@ -12,7 +12,7 @@ YDL_OPTIONS = {
     "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
     "noplaylist": False,
     "prefer_free_formats": False,
-    "extract_flat": True,
+    "extract_flat": False,
     "logger": logging,
     "cookiefile": "cookies.txt",
     "remote_components": ["ejs:github"],
