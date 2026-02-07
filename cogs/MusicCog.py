@@ -264,10 +264,6 @@ class MusicCog(commands.Cog):
             await response.send_message("Must skip 1 or more songs")
             return
 
-        if len(self.music_queue) < num_to_skip:
-            await response.send_message("There's not enough songs in the queue")
-            return
-
         # If skipping more than 1 song, remove n-1 songs from queue first
         if num_to_skip > 1:
             if len(self.music_queue) < num_to_skip:
