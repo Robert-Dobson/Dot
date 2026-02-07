@@ -154,7 +154,7 @@ class MusicCog(commands.Cog):
 
             ffmpeg_options = {
                 "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
-                "options": "-vn -b:a 128k -bufsize 512k",
+                "options": "-vn -b:a 128k -bufsize 512k -af volume=0.3",
             }
             self.connected_vc.play(
                 discord.FFmpegPCMAudio(queue_item["url"], executable="ffmpeg", **ffmpeg_options),
