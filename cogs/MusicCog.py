@@ -9,8 +9,10 @@ import random
 from yt_dlp import YoutubeDL
 
 YDL_OPTIONS = {
-    "format": "bestaudio/best",
+    "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
     "noplaylist": "True",
+    "prefer_free_formats": False,
+    "extract_flat": False,
     "logger": logging,
     "cookiefile": "cookies.txt",
     "remote_components": ["ejs:github"],
@@ -143,8 +145,8 @@ class MusicCog(commands.Cog):
             self.current_song = queue_item["title"]
             logging.info(f"Playing {self.current_song} in {queue_item['voice_channel'].name}")
             ffmpeg_options = {
-                "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-                "options": "-vn",
+                "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
+                "options": "-vn -b:a 128k -bufsize 512k",
             }
             self.connected_vc.play(
                 discord.FFmpegPCMAudio(queue_item["url"], executable="ffmpeg", **ffmpeg_options),
