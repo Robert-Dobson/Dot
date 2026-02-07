@@ -50,9 +50,15 @@ class MusicCog(commands.Cog):
     def download_song(self, query):
         """Extract song stream URL instead of downloading"""
         with YoutubeDL(YDL_OPTIONS) as ydl:
-            logging.info(f"Searching YouTube for {query}")
             try:
-                result = ydl.extract_info(f"ytsearch:{query}", download=False)
+                # Check if input is a URL or search query
+                if query.startswith(("http://", "https://", "www.")):
+                    logging.info(f"Extracting info from URL: {query}")
+                    result = ydl.extract_info(query, download=False)
+                else:
+                    logging.info(f"Searching YouTube for: {query}")
+                    result = ydl.extract_info(f"ytsearch:{query}", download=False)
+
                 info = ydl.sanitize_info(result)
 
                 if "entries" in info and info["entries"]:
