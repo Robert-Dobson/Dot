@@ -293,7 +293,7 @@ class MusicCog(commands.Cog):
 
         # Show upcoming songs
         if self.music_queue:
-            queue_text += f"📝 **Queue ({len(self.music_queue)} song(s)):**\n"
+            queue_text += f"**Queue ({len(self.music_queue)} song(s)):**\n"
             for i, song in enumerate(self.music_queue[:20], 1):
                 queue_text += f"`{i:2d}.` {song['title']}\n"
 
@@ -301,9 +301,9 @@ class MusicCog(commands.Cog):
                 queue_text += f"... and {len(self.music_queue) - 20} more songs"
         else:
             if not self.current_song:
-                queue_text = "📝 **Queue is empty!**\nUse `/play <song>` to add some music."
+                queue_text = "**Queue is empty!**\nUse `/play <song>` to add some music."
             else:
-                queue_text += "📝 **No songs in queue**\nCurrent song will finish, then playback will stop."
+                queue_text += "**No songs in queue**\nCurrent song will finish, then playback will stop."
 
         await interaction.response.send_message(queue_text)
 
