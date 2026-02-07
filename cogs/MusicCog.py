@@ -148,7 +148,7 @@ class MusicCog(commands.Cog):
         # Play next song
         try:
             self.current_song = queue_item["title"]
-            logging.info(f"Playing {self.current_song} in {queue_item['voice_channel'].name}")
+            logging.info(f"Playing {queue_item['url']} ({self.current_song}) in {queue_item['voice_channel'].name}")
 
             # Update voice channel status with current song
             if self.connected_vc and self.connected_vc.channel:
