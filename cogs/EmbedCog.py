@@ -14,6 +14,9 @@ class EmbedCog(commands.Cog):
         self.link_providers = [
             LinkProvider("Reddit", "reddit.com", "rxddit.com"),
             LinkProvider("Instagram", "instagram.com", "fxstagram.com"),
+            LinkProvider("Twitter", "twitter.com", "fxtwitter.com"),
+            LinkProvider("x", "x.com", "fixupx.com"),
+            LinkProvider("TikTok", "tiktok.com", "tnktok.com"),
         ]
 
     @commands.Cog.listener()
