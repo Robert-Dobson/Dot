@@ -52,7 +52,7 @@ class LinkProvider():
         self.name = name
         self.original_domain = original_domain
         self.replacement_domain = replacement_domain
-        self.regex = rf'(https?:\/\/(?:www\.)?{re.escape(original_domain)}\/[^\s]+)'
+        self.regex = rf'(https?:\/\/(?:www\.)?{re.escape(original_domain)}\/[^\s|]+)'
     
     def replace_link(self, text):
         """
