@@ -13,7 +13,9 @@ class EmbedCog(commands.Cog):
         self.bot = bot
         self.link_providers = [
             LinkProvider("Reddit", "reddit.com", "rxddit.com"),
-            LinkProvider("Instagram", "instagram.com", "fxstagram.com"),
+            LinkProvider("InstagramPost", "instagram.com/p", "fxstagram.com/p"),
+            LinkProvider("InstagramReel", "instagram.com/reel", "kkinstagram.com/reel"),
+            LinkProvider("YouTube", "youtube.com/watch", "fxtube.com/watch"),
             LinkProvider("Twitter", "twitter.com", "fxtwitter.com"),
             LinkProvider("x", "x.com", "fixupx.com"),
             LinkProvider("TikTok", "tiktok.com", "tnktok.com"),
@@ -56,7 +58,7 @@ class LinkProvider:
         self.name = name
         self.original_domain = original_domain
         self.replacement_domain = replacement_domain
-        self.regex = rf"(https?:\/\/(?:www\.)?{re.escape(original_domain)}\/[^\s|]+)"
+        self.regex = rf"(https?:\/\/(?:www\.)?{re.escape(original_domain)}[^\s|]+)"
 
     def replace_link(self, text):
         """
