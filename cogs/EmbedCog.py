@@ -13,9 +13,8 @@ class EmbedCog(commands.Cog):
         self.bot = bot
         self.link_providers = [
             LinkProvider("Reddit", "reddit.com", "rxddit.com"),
-            LinkProvider("InstagramPost", "instagram.com/p", "fxstagram.com/p"),
-            LinkProvider("InstagramReel", "instagram.com/reel", "kkinstagram.com/reel"),
-            LinkProvider("YouTube", "youtube.com/watch", "fxtube.com/watch"),
+            LinkProvider("Instagram Reels", "instagram.com/reel", "kkinstagram.com/reel"),
+            LinkProvider("Instagram (Other)", "instagram.com", "fxstagram.com"), # This should be after the Reels provider to avoid conflicts
             LinkProvider("Twitter", "twitter.com", "fxtwitter.com"),
             LinkProvider("x", "x.com", "fixupx.com"),
             LinkProvider("TikTok", "tiktok.com", "tnktok.com"),
