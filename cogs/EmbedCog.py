@@ -14,7 +14,8 @@ class EmbedCog(commands.Cog):
         self.link_providers = [
             LinkProvider("Reddit", "reddit.com", "rxddit.com"),
             LinkProvider("Instagram Reels", "instagram.com/reel", "kkinstagram.com/reel"),
-            LinkProvider("Instagram (Other)", "instagram.com", "fxstagram.com"), # This should be after the Reels provider to avoid conflicts
+            LinkProvider("Instagram Posts", "instagram.com/p", "fxstagram.com/p"),
+            LinkProvider("Instagram Stories", "instagram.com/stor", "fxstagram.com/stor"),
             LinkProvider("Twitter", "twitter.com", "fxtwitter.com"),
             LinkProvider("x", "x.com", "fixupx.com"),
             LinkProvider("TikTok", "tiktok.com", "tnktok.com"),
