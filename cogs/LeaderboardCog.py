@@ -7,11 +7,12 @@ from pathlib import Path
 LOGGER = logging.getLogger(__name__)
 LEADERBOARD_FILE = Path("./leaderboard.json")
 
+
 class LeaderboardCog(commands.Cog):
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-    
+
     def get_leaderboard(self):
         """
         Load the leaderboard from the JSON file. If the file doesn't exist, return an empty dictionary.
@@ -29,7 +30,7 @@ class LeaderboardCog(commands.Cog):
                 return json.load(f)
         else:
             return {}
-    
+
     def write_leaderboard(self, leaderboard):
         """
         Write the leaderboard to the JSON file.
@@ -45,7 +46,7 @@ class LeaderboardCog(commands.Cog):
         """
         if message.author == self.bot.user:
             return
-   
+
         LOGGER.info(f"Message received from {message.author.name} from {message.guild.name}")
         leaderboard = self.get_leaderboard()
         guild_id = str(message.guild.id)
@@ -61,19 +62,21 @@ class LeaderboardCog(commands.Cog):
             leaderboard[guild_id][user_id] = 1
 
         self.write_leaderboard(leaderboard)
-    
+
     @app_commands.command(description="Display the leaderboard for the current guild")
     async def leaderboard(self, interaction):
         """
         Command to display the leaderboard for the current guild.
         It retrieves the message counts for all users in the guild and displays them in descending order.
         """
+        await interaction.response.send_message("Calculating leaderboard, this might take a while!")
         leaderboard = self.get_leaderboard()
         guild_id = str(interaction.guild.id)
 
         if guild_id not in leaderboard or not leaderboard[guild_id]:
-            await interaction.response.send_message("No messages have been recorded for this server yet.")
+            await interaction.followup.send("No messages have been recorded for this server yet.")
             return
+
 
         # Sort users by message count in descending order
         sorted_leaderboard = sorted(leaderboard[guild_id].items(), key=lambda item: item[1], reverse=True)
@@ -84,8 +87,8 @@ class LeaderboardCog(commands.Cog):
             user = await self.bot.fetch_user(int(user_id))
             leaderboard_message += f"{i + 1}. {user.display_name}: {message_count} messages\n"
 
-        await interaction.response.send_message("Calculating leaderboard, this might take a while!")
         await interaction.followup.send(leaderboard_message)
+
 
 async def setup(bot):
     await bot.add_cog(LeaderboardCog(bot))
