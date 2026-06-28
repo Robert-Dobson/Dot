@@ -84,7 +84,8 @@ class LeaderboardCog(commands.Cog):
             user = await self.bot.fetch_user(int(user_id))
             leaderboard_message += f"{i + 1}. {user.display_name}: {message_count} messages\n"
 
-        await interaction.response.send_message(leaderboard_message)
+        await interaction.response.send_message("Calculating leaderboard, this might take a while!")
+        await interaction.followup.send(leaderboard_message)
 
 async def setup(bot):
     await bot.add_cog(LeaderboardCog(bot))
