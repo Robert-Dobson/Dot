@@ -206,7 +206,7 @@ class MusicCog(commands.Cog):
             await self.resume(interaction)
             return
 
-        await interaction.response.send_message("Searching for song, this might take a while!")
+        await interaction.response.defer()
 
         # Find song on YouTube in a thread
         coroutine = asyncio.to_thread(self.download_song, song_query)

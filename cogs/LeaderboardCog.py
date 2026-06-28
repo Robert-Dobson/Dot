@@ -85,7 +85,8 @@ class LeaderboardCog(commands.Cog):
         Command to display the leaderboard for the current guild.
         It retrieves the message counts for all users in the guild and displays them in descending order.
         """
-        await interaction.response.send_message("Calculating leaderboard, this might take a while!")
+
+        await interaction.response.defer()
         guild_id = str(interaction.guild.id)
 
         async with LOCK:
