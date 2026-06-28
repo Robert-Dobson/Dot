@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 
 
@@ -14,7 +15,7 @@ for filename in os.listdir("cogs"):
         asyncio.run(bot.load_extension(f"cogs.{filename[:-3]}"))
 
 # Run Bot
-handler = logging.FileHandler(filename="dot.log", encoding="utf-8", mode="a")
+handler = RotatingFileHandler(filename="dot.log", encoding="utf-8", mode="a", maxBytes=1024*1024*20, backupCount=5)
 load_dotenv()
 bot.run(
     os.getenv("discord_token"),
