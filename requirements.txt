@@ -2,4 +2,4 @@ discord.py
 psutil
 PyNaCl
 python-dotenv
-yt_dlp
+yt-dlp[default]
