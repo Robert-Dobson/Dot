@@ -99,7 +99,7 @@ class LeaderboardCog(commands.Cog):
             # Create a formatted string for the leaderboard
             leaderboard_message = "Leaderboard:\n"
             for i, (user_id, message_count) in enumerate(sorted_leaderboard):
-                user = await self.bot.fetch_user(int(user_id))
+                user = await interaction.guild.get_member(int(user_id))
                 leaderboard_message += f"{i + 1}. {user.display_name}: {message_count} messages\n"
 
             await interaction.followup.send(leaderboard_message)
