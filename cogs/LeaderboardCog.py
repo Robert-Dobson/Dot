@@ -63,16 +63,16 @@ class LeaderboardCog(commands.Cog):
         self.write_leaderboard(leaderboard)
     
     @app_commands.command(description="Display the leaderboard for the current guild")
-    async def leaderboard(self, ctx):
+    async def leaderboard(self, interaction):
         """
         Command to display the leaderboard for the current guild.
         It retrieves the message counts for all users in the guild and displays them in descending order.
         """
         leaderboard = self.get_leaderboard()
-        guild_id = str(ctx.guild.id)
+        guild_id = str(interaction.guild.id)
 
         if guild_id not in leaderboard or not leaderboard[guild_id]:
-            await ctx.send("No messages have been recorded for this server yet.")
+            await interaction.response.send_message("No messages have been recorded for this server yet.")
             return
 
         # Sort users by message count in descending order
@@ -82,9 +82,9 @@ class LeaderboardCog(commands.Cog):
         leaderboard_message = "Leaderboard:\n"
         for i, (user_id, message_count) in enumerate(sorted_leaderboard):
             user = await self.bot.fetch_user(int(user_id))
-            leaderboard_message += f"{i + 1}. {user.name}: {message_count} messages\n"
+            leaderboard_message += f"{i + 1}. {user.display_name}: {message_count} messages\n"
 
-        await ctx.send(leaderboard_message)
+        await interaction.response.send_message(leaderboard_message)
 
 async def setup(bot):
     await bot.add_cog(LeaderboardCog(bot))
