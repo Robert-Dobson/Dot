@@ -1,7 +1,8 @@
+from discord import app_commands
 from discord.ext import commands
-from pathlib import Path
-import logging
 import json
+import logging
+from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
 LEADERBOARD_FILE = Path("./leaderboard.json")
@@ -61,7 +62,7 @@ class LeaderboardCog(commands.Cog):
 
         self.write_leaderboard(leaderboard)
     
-    @commands.command()
+    @app_commands.command(description="Display the leaderboard for the current guild")
     async def leaderboard(self, ctx):
         """
         Command to display the leaderboard for the current guild.
