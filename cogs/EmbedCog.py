@@ -21,6 +21,7 @@ class EmbedCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        logger.warning("Test")
         if message.author == self.bot.user:
             return
 
@@ -52,7 +53,8 @@ class EmbedCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, reactionEvent):
-        logger.warning("Reaction received: {reactionEvent.emoji}")
+        logger.warning("test 2")
+        logger.warning("Reaction received: %s", reactionEvent.emoji)
 
         if reactionEvent.emoji.name != "❌":
             return
@@ -62,7 +64,7 @@ class EmbedCog(commands.Cog):
             return
 
         try:
-            message = await channel.fetch_message(reactionEvent.message.id)
+            message = await channel.fetch_message(reactionEvent.message_id)
 
             if message.author == self.bot.user:
                 await message.delete()
