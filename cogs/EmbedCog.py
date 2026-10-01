@@ -51,15 +51,26 @@ class EmbedCog(commands.Cog):
         await message.reply(content="\n".join(replaced_links))
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction, user):
-        # If user reacts to a message from bot with ❌ then delete the message
-        if reaction.message.author == self.bot.user and str(reaction.emoji) == "❌":
-            try:
-                await reaction.message.delete()
-            except discord.Forbidden:
-                logger.warning(
-                    f"Failed to delete message {reaction.message.id} in channel {reaction.message.channel.id} due to insufficient permissions."
-                )
+    async def on_raw_reaction_add(self, reactionEvent):
+        logger.warning("Reaction received: {reactionEvent.emoji}")
+
+        if reactionEvent.emoji.name != "❌":
+            return
+
+        channel = self.bot.get_channel(reactionEvent.channel_id)
+        if channel is None:
+            return
+
+        try:
+            message = await channel.fetch_message(reactionEvent.message.id)
+
+            if message.author == self.bot.user:
+                await message.delete()
+        except discord.Forbidden:
+            logger.warning(
+                f"Failed to delete message {reactionEvent.message_id} in channel {reactionEvent.channel_id} due to insufficient permissions.",
+            )
+
 
 class LinkProvider:
     def __init__(self, name, original_domain, replacement_domain):
