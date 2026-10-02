@@ -36,6 +36,8 @@ class EmbedCog(commands.Cog):
             if provider.original_domain not in message.content:
                 continue
 
+            logger.info(f"Found {provider.name} link in message {message.id} in channel {message.channel.id}. Replacing with {provider.replacement_domain}.")
+
             replaced_links.extend(provider.replace_link(message.content))
 
         if not replaced_links:
@@ -50,7 +52,8 @@ class EmbedCog(commands.Cog):
             )
 
         links = "\n".join(replaced_links)
-        content = f"{links}\n\n-# If I got this wrong, react with ❌ to delete this message within 5 minutes."
+        content = f"{links}\n\n-# If I got this wrong, react with ❌ within 5 minutes to delete this message."
+        logger.info(f"Replying to message {message.id} in channel {message.channel.id} with replaced links.")
         await message.reply(content=content)
 
     @commands.Cog.listener()
@@ -66,9 +69,11 @@ class EmbedCog(commands.Cog):
             message = await channel.fetch_message(reactionEvent.message_id)
 
             if message.created_at < (discord.utils.utcnow() - datetime.timedelta(minutes=5)):
+                logger.info(f"Reaction ❌ on message {reactionEvent.message_id} in channel {reactionEvent.channel_id} ignored due to time limit.")
                 return
 
             if message.author == self.bot.user:
+                logger.info(f"Deleting message {reactionEvent.message_id} in channel {reactionEvent.channel_id} due to ❌ reaction.")
                 await message.delete()
         except discord.Forbidden:
             logger.warning(
