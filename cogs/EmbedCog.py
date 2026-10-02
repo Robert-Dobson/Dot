@@ -3,6 +3,7 @@ import re
 import discord
 from discord.ext import commands
 import logging
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -13,15 +14,15 @@ class EmbedCog(commands.Cog):
         self.bot = bot
         self.link_providers = [
             LinkProvider("Reddit", "reddit.com", "vxreddit.com"),
-            LinkProvider("Instagram", "instagram.com", "kkinstagram.com"),
+            LinkProvider("Instagram", "instagram.com", "oginstagram.com"),
             LinkProvider("Twitter", "twitter.com", "fxtwitter.com"),
             LinkProvider("x", "x.com", "fixupx.com"),
             LinkProvider("TikTok", "tiktok.com", "tnktok.com"),
+            LinkProvider("Spotify", "spotify.com", "fxspotify.com"),
         ]
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        logger.warning("Test")
         if message.author == self.bot.user:
             return
 
@@ -40,7 +41,7 @@ class EmbedCog(commands.Cog):
         if not replaced_links:
             return
 
-        # Delete embeds on the original message]
+        # Delete embeds on the original message
         try:
             await message.edit(suppress=True)
         except discord.Forbidden:
@@ -48,14 +49,12 @@ class EmbedCog(commands.Cog):
                 f"Failed to suppress embeds for message {message.id} in channel {message.channel.id} due to insufficient permissions."
             )
 
-        # Reply with new links, preserving spoiler formatting if applicable
-        await message.reply(content="\n".join(replaced_links))
+        links = "\n".join(replaced_links)
+        content = f"{links}\n\n-# If I got this wrong, react with ❌ to delete this message within 5 minutes."
+        await message.reply(content=content)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, reactionEvent):
-        logger.warning("test 2")
-        logger.warning("Reaction received: %s", reactionEvent.emoji)
-
         if reactionEvent.emoji.name != "❌":
             return
 
@@ -65,6 +64,9 @@ class EmbedCog(commands.Cog):
 
         try:
             message = await channel.fetch_message(reactionEvent.message_id)
+
+            if message.created_at < (discord.utils.utcnow() - datetime.timedelta(minutes=5)):
+                return
 
             if message.author == self.bot.user:
                 await message.delete()
