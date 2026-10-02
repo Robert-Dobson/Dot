@@ -52,7 +52,7 @@ class EmbedCog(commands.Cog):
             )
 
         links = "\n".join(replaced_links)
-        content = f"{links}\n\n-# If I got this wrong, react with ❌ within 5 minutes to delete this message."
+        content = f"{links}\n-# If I got this wrong, react with ❌ within 5 minutes to delete this message."
         logger.info(f"Replying to message {message.id} in channel {message.channel.id} with replaced links.")
         await message.reply(content=content)
 
