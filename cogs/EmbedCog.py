@@ -18,7 +18,7 @@ class EmbedCog(commands.Cog):
             LinkProvider("Twitter", "twitter.com", "fxtwitter.com"),
             LinkProvider("x", "x.com", "fixupx.com"),
             LinkProvider("TikTok", "tiktok.com", "tnktok.com"),
-            LinkProvider("Spotify", "spotify.com", "fxspotify.com"),
+            LinkProvider("Spotify", "spotify.com", "fixspotify.com"),
         ]
 
     @commands.Cog.listener()
