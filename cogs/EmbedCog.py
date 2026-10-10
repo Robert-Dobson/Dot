@@ -16,11 +16,23 @@ class EmbedCog(commands.Cog):
         self.bot = bot
         # https://github.com/Kyrela/FixTweetBot/blob/main/README.md#awesome-fixers
         self.link_providers = [
-            LinkProvider(name="Reddit", original_domain="reddit.com", replacement_domains=["vxreddit.com", "rxddit.com", "redditez.com"]),
-            LinkProvider(name="Instagram", original_domain="instagram.com", replacement_domains=["oginstagram.com", "uuinstagram.com", "zzinstagram.com", "kkinstagram.com"]),
-            LinkProvider(name="Twitter", original_domain="twitter.com", replacement_domains=["fxtwitter.com", "vxtwitter.com"]),
+            LinkProvider(
+                name="Reddit",
+                original_domain="reddit.com",
+                replacement_domains=["vxreddit.com", "rxddit.com", "redditez.com"],
+            ),
+            LinkProvider(
+                name="Instagram",
+                original_domain="instagram.com",
+                replacement_domains=["oginstagram.com", "uuinstagram.com", "zzinstagram.com", "kkinstagram.com"],
+            ),
+            LinkProvider(
+                name="Twitter", original_domain="twitter.com", replacement_domains=["fxtwitter.com", "vxtwitter.com"]
+            ),
             LinkProvider(name="x", original_domain="x.com", replacement_domains=["fixupx.com", "fixvx.com"]),
-            LinkProvider(name="Spotify", original_domain="spotify.com", replacement_domains=["fixspotify.com", "fixspotify.com"]),
+            LinkProvider(
+                name="Spotify", original_domain="spotify.com", replacement_domains=["fixspotify.com", "fixspotify.com"]
+            ),
         ]
 
     @commands.Cog.listener()
@@ -116,7 +128,7 @@ class LinkProvider:
         for replacement_domain in self.replacement_domain:
             replaced_link = link.replace(self.original_domain, replacement_domain)
 
-            if requests.get(replaced_link).status_code != 200:
+            if self.is_valid_link(replaced_link):
                 logger.warning(
                     f"Replacement link {replaced_link} for {self.name} does not return a 200 status code. Skipping."
                 )
@@ -126,6 +138,45 @@ class LinkProvider:
             return replaced_link
 
         return None
+
+    def is_valid_link(self, url, timeout=10):
+        headers = {
+            # Present to be discordbot: https://support.discord.com/hc/en-us/articles/42500550752919-About-Discord-Link-Previews-and-the-Discordbot
+            "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"
+        }
+
+        try:
+            # Some embed services redirect to the original domain for users, so disable redirects
+            response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=False)
+
+            if response.status_code == 200:
+                html_content = response.text
+
+                if self.is_valid_open_graph_object(html_content):
+                    print(f"Valid embed payload found! Status Code: {response.status_code}")
+                    return True
+                else:
+                    print("URL loaded, but lacks proper Open Graph metadata tags for an embed.")
+                    return False
+            else:
+                print(f"Server returned an error status code: {response.status_code}")
+                return False
+
+        except requests.RequestException as e:
+            print(f"Network error trying to fetch the embed: {e}")
+            return False
+
+    def is_valid_open_graph_object(self, html_content):
+        """
+        Checks if the HTML content contains mandatory Open Graph metadata tags.
+        https://ogp.me/
+        """
+        return (
+            '<meta property="og:title"' in html_content
+            and '<meta property="og:type"' in html_content
+            and '<meta property="og:image"' in html_content
+            and '<meta property="og:url"' in html_content
+        )
 
 
 async def setup(bot):
