@@ -151,6 +151,7 @@ class LinkProvider:
 
             if response.status_code == 200:
                 html_content = response.text
+                logger.debug(f"HTML content for {url}: {html_content}")
 
                 if self.is_valid_open_graph_object(html_content):
                     print(f"Valid embed payload found! Status Code: {response.status_code}")
@@ -174,7 +175,7 @@ class LinkProvider:
         return (
             '<meta property="og:title"' in html_content
             and '<meta property="og:type"' in html_content
-            and '<meta property="og:image"' in html_content
+            # and '<meta property="og:image"' in html_content # While the documentation says this is required, some embeds don't have an image and still work fine.
             and '<meta property="og:url"' in html_content
         )
 
