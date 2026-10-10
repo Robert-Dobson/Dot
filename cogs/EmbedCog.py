@@ -1,5 +1,7 @@
 import re
 
+import requests
+
 import discord
 from discord.ext import commands
 import logging
@@ -12,33 +14,27 @@ class EmbedCog(commands.Cog):
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
+        # https://github.com/Kyrela/FixTweetBot/blob/main/README.md#awesome-fixers
         self.link_providers = [
-            LinkProvider("Reddit", "reddit.com", "vxreddit.com"),
-            LinkProvider("Instagram", "instagram.com", "oginstagram.com"),
-            LinkProvider("Twitter", "twitter.com", "fxtwitter.com"),
-            LinkProvider("x", "x.com", "fixupx.com"),
-            LinkProvider("TikTok", "tiktok.com", "tnktok.com"),
-            LinkProvider("Spotify", "spotify.com", "fixspotify.com"),
+            LinkProvider(name="Reddit", original_domain="reddit.com", replacement_domains=["vxreddit.com", "rxddit.com", "redditez.com"]),
+            LinkProvider(name="Instagram", original_domain="instagram.com", replacement_domains=["oginstagram.com", "uuinstagram.com", "zzinstagram.com", "kkinstagram.com"]),
+            LinkProvider(name="Twitter", original_domain="twitter.com", replacement_domains=["fxtwitter.com", "vxtwitter.com"]),
+            LinkProvider(name="x", original_domain="x.com", replacement_domains=["fixupx.com", "fixvx.com"]),
+            LinkProvider(name="Spotify", original_domain="spotify.com", replacement_domains=["fixspotify.com", "fixspotify.com"]),
         ]
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        """
+        Process incoming messages and replace links with alternative versions.
+        """
         if message.author == self.bot.user:
             return
 
-        # Filter out messages that don't have links to avoid unnecessary processing
-        if "https://" not in message.content and "http://" not in message.content:
-            return
-
-        # Process each link provider, e.g. Reddit, Instagram, etc.
+        # Get all replaced links from the message contents, configured by the link providers
         replaced_links = []
         for provider in self.link_providers:
-            if provider.original_domain not in message.content:
-                continue
-
-            logger.info(f"Found {provider.name} link in message {message.id} in channel {message.channel.id}. Replacing with {provider.replacement_domain}.")
-
-            replaced_links.extend(provider.replace_link(message.content))
+            replaced_links.extend(provider.replace_all_links(message.content))
 
         if not replaced_links:
             return
@@ -58,6 +54,9 @@ class EmbedCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, reactionEvent):
+        """
+        Delete the bot's message if a user reacts with ❌ within 5 minutes of the message being sent.
+        """
         if reactionEvent.emoji.name != "❌":
             return
 
@@ -69,11 +68,15 @@ class EmbedCog(commands.Cog):
             message = await channel.fetch_message(reactionEvent.message_id)
 
             if message.created_at < (discord.utils.utcnow() - datetime.timedelta(minutes=5)):
-                logger.info(f"Reaction ❌ on message {reactionEvent.message_id} in channel {reactionEvent.channel_id} ignored due to time limit.")
+                logger.info(
+                    f"Reaction ❌ on message {reactionEvent.message_id} in channel {reactionEvent.channel_id} ignored due to time limit."
+                )
                 return
 
             if message.author == self.bot.user:
-                logger.info(f"Deleting message {reactionEvent.message_id} in channel {reactionEvent.channel_id} due to ❌ reaction.")
+                logger.info(
+                    f"Deleting message {reactionEvent.message_id} in channel {reactionEvent.channel_id} due to ❌ reaction."
+                )
                 await message.delete()
         except discord.Forbidden:
             logger.warning(
@@ -82,25 +85,47 @@ class EmbedCog(commands.Cog):
 
 
 class LinkProvider:
-    def __init__(self, name, original_domain, replacement_domain):
+    def __init__(self, name, original_domain, replacement_domains):
         self.name = name
         self.original_domain = original_domain
-        self.replacement_domain = replacement_domain
+        self.replacement_domain = replacement_domains
         self.regex = rf"(https?://(?:[\w-]+\.)?{re.escape(original_domain)}[^\s|]+)"
 
-    def replace_link(self, text):
+    def replace_all_links(self, text):
         """
-        Finds all links matching the provider's domain in the text, replaces the domain, and preserves spoiler formatting if applicable.
+        Finds all links in the text that contain the original domain and replaces each one with the first valid replacement. Returns a list of replaced links.
         """
+        if self.original_domain not in text:
+            return []
+
         matches = re.findall(self.regex, text)
         results = []
         for match in matches:
-            replaced_link = match.replace(self.original_domain, self.replacement_domain)
-            if re.search(rf"\|\|[^\|]*{re.escape(match)}[^\|]*\|\|", text):
-                # Add spaces around the link to prevent Discord from including | in the link itself when it's inside spoiler tags
-                replaced_link = f"|| {replaced_link} ||"
-            results.append(replaced_link)
+            if (replaced_link := self.replace_link(match)) is not None:
+                if re.search(rf"\|\|[^\|]*{re.escape(match)}[^\|]*\|\|", text):
+                    # Add spaces around the link to prevent Discord from including | in the link itself when it's inside spoiler tags
+                    replaced_link = f"|| {replaced_link} ||"
+                results.append(replaced_link)
+
         return results
+
+    def replace_link(self, link):
+        """
+        Replaces the original domain in a single link with the replacement domain, and returns first valid replacement link or None if no valid replacement is found.
+        """
+        for replacement_domain in self.replacement_domain:
+            replaced_link = link.replace(self.original_domain, replacement_domain)
+
+            if requests.get(replaced_link).status_code != 200:
+                logger.warning(
+                    f"Replacement link {replaced_link} for {self.name} does not return a 200 status code. Skipping."
+                )
+                continue
+
+            logger.info(f"Replaced link {link} with {replaced_link} for {self.name}.")
+            return replaced_link
+
+        return None
 
 
 async def setup(bot):
