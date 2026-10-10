@@ -24,7 +24,7 @@ class DotBot(commands.Bot):
 async def main():
     handler = RotatingFileHandler(filename="dot.log", encoding="utf-8", mode="a", maxBytes=1024 * 1024 * 20, backupCount=5)
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(logging.INFO)
     root_logger.addHandler(handler)
 
     bot = DotBot(command_prefix="/", intents=discord.Intents.all())
