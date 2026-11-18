@@ -75,7 +75,7 @@ class StepCog(commands.Cog):
             return
 
         try:
-            bytes = csv.read()
+            bytes = await csv.read()
             df = pd.read_csv(BytesIO(bytes), na_values=["N.A"])
             summary = process_report(df)
             await interaction.response.send_message(summary)
