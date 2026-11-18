@@ -13,15 +13,16 @@ class ProcessedResult:
         self.num_of_missing_data = num_of_missing_data
         self.num_of_people_missing = num_of_people_missing
 
+
 def process_report(data_frame: pd.DataFrame) -> str:
-    total_steps = data_frame['Total Steps'].sum(numeric_only=True)
-    average_steps = data_frame['Avg Daily Steps'].mean(numeric_only=True)
+    total_steps = data_frame["Total Steps"].sum(numeric_only=True)
+    average_steps = data_frame["Avg Daily Steps"].mean(numeric_only=True)
 
     current_week_start, current_week_end = get_formatted_date(7), get_formatted_date(1)
     current_week = calculate_time_slice(data_frame, current_week_start, current_week_end)
     previous_week = calculate_time_slice(data_frame, get_formatted_date(14), get_formatted_date(8))
 
-    report =  f"""Walking Report ({current_week_start} to {current_week_end}):
+    report = f"""Walking Report ({current_week_start} to {current_week_end}):
 - {int(current_week.total_steps)} total steps ({int(current_week.total_steps - previous_week.total_steps):+} steps)
 - This is {steps_to_km(current_week.total_steps)} kilometers!
 - {current_week.average_steps.round(2)} average steps per person per day ({(current_week.average_steps - previous_week.average_steps).round(2):+} steps)
@@ -31,7 +32,7 @@ def process_report(data_frame: pd.DataFrame) -> str:
         report += f"""
 - Note: There are {current_week.num_of_missing_data} entries missing across {current_week.num_of_people_missing} people"""
 
-    report+= f""" 
+    report += f""" 
 
 Therefore, as of {current_week_end}:
 - Total step count: {int(total_steps)}
@@ -40,9 +41,11 @@ Therefore, as of {current_week_end}:
 
     return report
 
+
 def steps_to_km(steps: int, stride_length_m: float = 0.762) -> float:
     distance_km = (steps * stride_length_m) / 1000
     return round(distance_km, 2)
+
 
 def calculate_time_slice(data_frame: pd.DataFrame, from_time: str, to_time: str):
     # Both are formated as "YYYY-MM-DD"
@@ -54,15 +57,21 @@ def calculate_time_slice(data_frame: pd.DataFrame, from_time: str, to_time: str)
 
     return ProcessedResult(total_steps, average_steps, num_of_missing_data, num_of_people_missing)
 
+
 def get_formatted_date(days_offset):
-    date = dt.datetime.now() -  dt.timedelta(days=days_offset)
+    date = dt.datetime.now() - dt.timedelta(days=days_offset)
     return date.strftime("%Y-%m-%d")
 
+
 class StepCog(commands.Cog):
+    def __init__(self, bot):
+        super().__init__()
+        self.bot = bot
+
     @app_commands.command(description="Generates a Stepup report using a given csv")
-    async def step_report(self, interaction, csv : discord.Attachment):
+    async def step_report(self, interaction, csv: discord.Attachment):
         if not csv.filename.endswith(".csv"):
-            await interaction.response.send_message("Not a csv file") 
+            await interaction.response.send_message("Not a csv file")
             return
 
         try:
@@ -72,3 +81,7 @@ class StepCog(commands.Cog):
             await interaction.response.send_message(summary)
         except Exception as e:
             await interaction.response.send_message(f"Invalid csv file: {e}")
+
+
+async def setup(bot):
+    await bot.add_cog(StepCog(bot))
